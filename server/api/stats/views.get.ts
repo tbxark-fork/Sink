@@ -5,7 +5,7 @@ import { z } from 'zod'
 const { select } = SqlBricks
 
 const unitMap: { [x: string]: string } = {
-  minute: '%H:%M',
+  minute: '%Y-%m-%d %H:%i',
   hour: '%Y-%m-%d %H',
   day: '%Y-%m-%d',
 }

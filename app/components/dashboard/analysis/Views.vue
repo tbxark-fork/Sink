@@ -71,8 +71,11 @@ function getUnit(startAt: number, endAt: number): 'minute' | 'hour' | 'day' {
 
 function parseTimeString(time: string): number {
   if (time.includes(' ')) {
-    const [date, hour] = time.split(' ')
-    return new Date(`${date}T${hour.padStart(2, '0')}:00:00`).getTime()
+    const [date, timePart] = time.split(' ')
+    const normalizedTime = timePart.includes(':')
+      ? timePart
+      : `${timePart.padStart(2, '0')}:00`
+    return new Date(`${date}T${normalizedTime}:00`).getTime()
   }
   return new Date(time).getTime()
 }
@@ -108,14 +111,6 @@ onMounted(async () => {
 })
 
 type Data = ViewDataPoint
-
-function formatXAxis(timestamp: number): string {
-  const { startAt, endAt } = effectiveTimeRange.value
-  if (getUnit(startAt, endAt) === 'hour')
-    return shortTime(timestamp / 1000)
-
-  return shortDate(timestamp / 1000)
-}
 </script>
 
 <template>
@@ -159,19 +154,9 @@ function formatXAxis(timestamp: number): string {
             :y="categories.map(cat => (d: Data) => d[cat as keyof Data] as number)"
             :color="categories.map(cat => chartConfig[cat]?.color ?? 'var(--chart-1)')"
             :rounded-corners="4"
+            :group-width="getUnit(startAt, endAt) === 'minute' ? 8 : undefined"
           />
         </template>
-
-        <VisAxis
-          v-if="mode === 'full' && views.length"
-          type="x"
-          :x="(d: Data) => parseTimeString(d.time)"
-          :num-ticks="7"
-          :tick-format="formatXAxis"
-          :tick-line="false"
-          :domain-line="false"
-          :grid-line="false"
-        />
 
         <VisAxis
           v-if="mode === 'full' && views.length"

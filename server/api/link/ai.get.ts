@@ -15,7 +15,7 @@ export default eventHandler(async (event) => {
 
     const workersai = createWorkersAI({ binding: AI })
     const { output } = await generateText({
-      model: workersai(aiModel),
+      model: workersai(aiModel as Parameters<typeof workersai>[0]),
       output: Output.object({
         schema: z.object({
           slug: z.string().describe('The generated slug for the URL'),

@@ -16,9 +16,16 @@ function query2sql(query: z.infer<typeof MetricsQuerySchema>, event: H3Event): s
   const filter = query2filter(query)
   const { dataset } = useRuntimeConfig(event)
 
-  const sql = select(`${logsMap[query.type]} as name, SUM(_sample_interval) as count`).from(dataset).where(filter).groupBy('name').orderBy('count DESC').limit(query.limit)
+  const sql = select(`${logsMap[query.type]} as name, SUM(_sample_interval) as count`)
+    .from(dataset)
+    .where(filter)
+    .groupBy('name')
+    .orderBy('count DESC')
+
   appendTimeFilter(sql, query)
-  return sql.toString()
+
+  const limit = Math.max(0, Math.floor(query.limit))
+  return `${sql.toString()} LIMIT ${limit}`
 }
 
 export default eventHandler(async (event) => {
