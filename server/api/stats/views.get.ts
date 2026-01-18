@@ -11,8 +11,11 @@ const unitMap: { [x: string]: string } = {
 }
 
 const ViewsQuerySchema = QuerySchema.extend({
-  unit: z.string(),
-  clientTimezone: z.string().default('Etc/UTC'),
+  unit: z.enum(['minute', 'hour', 'day']),
+  clientTimezone: z.string()
+    .regex(/^[A-Z_]+(?:\/[A-Z_-]+)*$/i)
+    .max(64)
+    .default('Etc/UTC'),
 })
 
 function query2sql(query: z.infer<typeof ViewsQuerySchema>, event: H3Event): string {

@@ -1,8 +1,11 @@
-<script setup>
+<script setup lang="ts">
+import 'vue-sonner/style.css'
+
 const { title, description, image } = useAppConfig()
+const route = useRoute()
 
 useSeoMeta({
-  title: `${title} - ${description}`,
+  title: `${title} - Link Shortener with Analytics`,
   description,
   ogType: 'website',
   ogTitle: title,
@@ -23,10 +26,13 @@ useHead({
     {
       name: 'viewport',
       content: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0',
-      tagPosition: 'head',
     },
   ],
   link: [
+    {
+      rel: 'canonical',
+      href: computed(() => `https://sink.cool${route.path}`),
+    },
     {
       rel: 'icon',
       type: 'image/png',
@@ -44,6 +50,6 @@ useHead({
   <NuxtLayout>
     <NuxtLoadingIndicator color="#000" />
     <NuxtPage />
-    <Toaster />
+    <Toaster position="top-center" rich-colors />
   </NuxtLayout>
 </template>
