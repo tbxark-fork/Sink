@@ -4,7 +4,8 @@
   "main": "dist/server/index.mjs",
   "assets": {
     "binding": "ASSETS",
-    "directory": "dist/public"
+    "directory": "dist/public",
+    "html_handling": "drop-trailing-slash"
   },
   "compatibility_date": "2025-05-08",
   "compatibility_flags": [
