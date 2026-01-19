@@ -22,7 +22,7 @@ defineProps<{
       <AvatarFallback>
         <img
           src="/icon.png"
-          alt="Sink"
+          :alt="name"
           loading="lazy"
         >
       </AvatarFallback>

@@ -39,7 +39,7 @@ const { stats } = useGithubStats()
                 >
                   <img
                     src="/sink.png"
-                    :alt="title"
+                    :alt="`${title} Logo`"
                     class="size-full rounded-full"
                   >
                 </span>
@@ -150,7 +150,7 @@ const { stats } = useGithubStats()
                 >
                   <img
                     src="/sink.png"
-                    :alt="title"
+                    :alt="`${title} Logo`"
                     class="size-full rounded-full"
                   >
                 </span>

@@ -29,7 +29,7 @@ const formattedStars = computed(() => {
       <SidebarMenu>
         <SidebarMenuItem>
           <div
-            class="flex w-full px-2 py-1.5" :class="[
+            class="flex w-full p-1.5 pr-0" :class="[
               state === 'collapsed'
                 ? 'flex-col items-center gap-2'
                 : 'items-center justify-between',

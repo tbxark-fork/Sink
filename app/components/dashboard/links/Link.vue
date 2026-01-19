@@ -50,7 +50,7 @@ function copyLink() {
             <AvatarFallback>
               <img
                 src="/icon.png"
-                alt="Sink"
+                :alt="link.slug"
                 loading="lazy"
               >
             </AvatarFallback>
