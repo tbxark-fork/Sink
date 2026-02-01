@@ -221,3 +221,59 @@ refactor: simplify link store logic
 - `simple-git-hooks` runs `lint-staged` on commit
 - `lint-staged` runs `eslint --fix` on staged `.js`, `.ts`, `.tsx`, `.vue` files
 - Always run `pnpm lint:fix` before committing
+
+## UI Patterns
+
+### Responsive Modal
+
+For modal dialogs that need mobile optimization, use the `ResponsiveModal` component located at `app/components/ResponsiveModal.vue`:
+
+- **Desktop (≥640px)**: Centered Dialog
+- **Mobile (<640px)**: Bottom Drawer
+
+**Usage:**
+
+```vue
+<ResponsiveModal v-model:open="isOpen" title="Title" description="Optional description">
+  <template #trigger>
+    <Button>Open</Button>
+  </template>
+
+  <!-- Main content -->
+  <div>Your form or content here</div>
+
+  <template #footer>
+    <Button variant="secondary" @click="isOpen = false">Cancel</Button>
+    <Button @click="save">Save</Button>
+  </template>
+</ResponsiveModal>
+```
+
+**Props:**
+
+| Prop           | Type      | Default  | Description                    |
+| -------------- | --------- | -------- | ------------------------------ |
+| `open`         | `boolean` | `false`  | v-model for open state         |
+| `title`        | `string`  | required | Modal title                    |
+| `description`  | `string`  | -        | Optional description           |
+| `contentClass` | `string`  | -        | Additional classes for content |
+
+**When to use:**
+
+- Forms with multiple fields (create/edit dialogs)
+- Content that may require scrolling on mobile
+- Date pickers, complex selectors
+- Any modal that benefits from bottom sheet UX on mobile
+
+**When NOT to use:**
+
+- Simple confirmation dialogs (use `AlertDialog` instead)
+- Command palette / search (use dedicated components like `Search.vue`)
+
+**Implementation notes:**
+
+- Uses `v-if/v-else` to switch between Dialog and Drawer based on screen width
+- Does NOT use `createReusableTemplate` because `DialogTrigger as-child` requires attrs to be bound directly to the trigger element, which would complicate the API for consumers
+- For components that define their own trigger content (not via slot), see `Search.vue` for a `createReusableTemplate` pattern
+
+**Reference implementation:** See `app/components/dashboard/links/editor/` for a modular form example using `ResponsiveModal`.

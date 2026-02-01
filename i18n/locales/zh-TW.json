@@ -236,6 +236,7 @@
       "og_description_placeholder": "連結描述",
       "og_image": "圖片",
       "advanced": "進階設置",
+      "more_options": "更多選項",
       "image_invalid_type": "請上傳圖片檔案",
       "image_size_limit": "圖片大小不能超過 5MB",
       "image_upload_success": "圖片上傳成功",

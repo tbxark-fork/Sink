@@ -236,6 +236,7 @@
       "og_description_placeholder": "Description du lien",
       "og_image": "Image",
       "advanced": "Avancé",
+      "more_options": "Plus d'options",
       "image_invalid_type": "Veuillez télécharger un fichier image",
       "image_size_limit": "La taille de l'image ne peut pas dépasser 5 Mo",
       "image_upload_success": "Image téléchargée avec succès",

@@ -236,6 +236,7 @@
       "og_description_placeholder": "Link description",
       "og_image": "Image",
       "advanced": "Advanced",
+      "more_options": "More Options",
       "image_invalid_type": "Please upload an image file",
       "image_size_limit": "Image size cannot exceed 5MB",
       "image_upload_success": "Image uploaded successfully",

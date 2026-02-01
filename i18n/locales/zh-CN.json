@@ -236,6 +236,7 @@
       "og_description_placeholder": "链接描述",
       "og_image": "图片",
       "advanced": "高级设置",
+      "more_options": "更多选项",
       "image_invalid_type": "请上传图片文件",
       "image_size_limit": "图片大小不能超过 5MB",
       "image_upload_success": "图片上传成功",

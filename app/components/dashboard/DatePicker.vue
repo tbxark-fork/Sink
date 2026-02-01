@@ -127,54 +127,48 @@ onBeforeMount(() => {
     </SelectContent>
   </Select>
 
-  <Dialog v-model:open="openCustomDateRange">
-    <DialogContent
-      class="
-        max-h-[95svh] w-auto max-w-[95svw] grid-rows-[auto_minmax(0,1fr)_auto]
-        md:max-w-(--breakpoint-md)
-      "
+  <ResponsiveModal
+    v-model:open="openCustomDateRange"
+    :title="$t('dashboard.date_picker.custom_title')"
+    content-class="w-auto md:max-w-(--breakpoint-md)"
+  >
+    <Tabs
+      default-value="range"
     >
-      <DialogHeader>
-        <DialogTitle>{{ $t('dashboard.date_picker.custom_title') }}</DialogTitle>
-      </DialogHeader>
-      <Tabs
-        default-value="range"
+      <div class="flex justify-center">
+        <TabsList>
+          <TabsTrigger value="date">
+            {{ $t('dashboard.date_picker.single_date') }}
+          </TabsTrigger>
+          <TabsTrigger value="range">
+            {{ $t('dashboard.date_picker.date_range') }}
+          </TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent
+        value="date"
+        class="h-80 overflow-y-auto"
       >
-        <div class="flex justify-center">
-          <TabsList>
-            <TabsTrigger value="date">
-              {{ $t('dashboard.date_picker.single_date') }}
-            </TabsTrigger>
-            <TabsTrigger value="range">
-              {{ $t('dashboard.date_picker.date_range') }}
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent
-          value="date"
-          class="h-80 overflow-y-auto"
-        >
-          <Calendar
-            :model-value="customDate"
-            weekday-format="short"
-            :is-date-disabled="isDateDisabled"
-            @update:model-value="updateCustomDate"
-          />
-        </TabsContent>
-        <TabsContent
-          value="range"
-          class="h-80 overflow-y-auto"
-        >
-          <RangeCalendar
-            :model-value="customDateRange"
-            initial-focus
-            weekday-format="short"
-            :number-of-months="2"
-            :is-date-disabled="isDateDisabled"
-            @update:model-value="updateCustomDateRange"
-          />
-        </TabsContent>
-      </Tabs>
-    </DialogContent>
-  </Dialog>
+        <Calendar
+          :model-value="customDate"
+          weekday-format="short"
+          :is-date-disabled="isDateDisabled"
+          @update:model-value="updateCustomDate"
+        />
+      </TabsContent>
+      <TabsContent
+        value="range"
+        class="h-80 overflow-y-auto"
+      >
+        <RangeCalendar
+          :model-value="customDateRange"
+          initial-focus
+          weekday-format="short"
+          :number-of-months="2"
+          :is-date-disabled="isDateDisabled"
+          @update:model-value="updateCustomDateRange"
+        />
+      </TabsContent>
+    </Tabs>
+  </ResponsiveModal>
 </template>
