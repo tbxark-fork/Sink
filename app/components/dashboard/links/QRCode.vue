@@ -13,6 +13,7 @@ const options = {
   width: 256,
   height: 256,
   data: props.data,
+  type: 'svg',
   margin: 10,
   qrOptions: { typeNumber: 0 as const, mode: 'Byte' as const, errorCorrectionLevel: 'Q' as const },
   imageOptions: { hideBackgroundDots: true, imageSize: 0.4, margin: 2 },
