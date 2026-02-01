@@ -108,6 +108,7 @@ const { title, description, github, twitter } = useAppConfig()
             lg:w-[420px]
           "
           aria-label="Link sharing illustration"
+          suppressHydrationWarning
         />
       </div>
     </div>

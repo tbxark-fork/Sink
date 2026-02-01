@@ -20,5 +20,7 @@ export const LinkSchema = z.object({
   }).optional(),
   title: z.string().trim().max(2048).optional(),
   description: z.string().trim().max(2048).optional(),
-  image: z.string().trim().url().max(2048).optional(),
+  image: z.string().trim().max(128).optional(),
+  apple: z.string().trim().url().max(2048).optional(),
+  google: z.string().trim().url().max(2048).optional(),
 })
