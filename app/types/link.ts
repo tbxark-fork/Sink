@@ -1,9 +1,8 @@
-import type { LinkSchema } from '@@/schemas/link'
+import type { Link } from '@@/schemas/link'
 import type { DateValue } from '@internationalized/date'
 import type { AnyFieldApi } from '@tanstack/vue-form'
-import type { z } from 'zod'
 
-export type Link = z.infer<typeof LinkSchema>
+export type { Link }
 
 export type LinkUpdateType = 'create' | 'edit' | 'delete'
 

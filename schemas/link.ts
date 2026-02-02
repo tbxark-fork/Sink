@@ -24,3 +24,5 @@ export const LinkSchema = z.object({
   apple: z.string().trim().url().max(2048).optional(),
   google: z.string().trim().url().max(2048).optional(),
 })
+
+export type Link = z.infer<typeof LinkSchema>

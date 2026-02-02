@@ -2,6 +2,7 @@
 import type { ChartConfig } from '@/components/ui/chart'
 import type { ViewDataPoint } from '@/types'
 import { VisArea, VisAxis, VisGroupedBar, VisLine, VisXYContainer } from '@unovis/vue'
+import { watchDeep } from '@vueuse/core'
 import {
   ChartTooltipContent,
   componentToString,
@@ -20,7 +21,7 @@ const props = withDefaults(defineProps<{
 
 const { t } = useI18n()
 
-const views = ref<ViewDataPoint[]>([])
+const views = shallowRef<ViewDataPoint[]>([])
 
 const isAreaMode = computed(() => props.chartType === 'area' && views.value.length > 1)
 
@@ -72,15 +73,15 @@ function getUnit(startAt: number, endAt: number): 'minute' | 'hour' | 'day' {
 function parseTimeString(time: string): number {
   if (time.includes(' ')) {
     const [date, timePart] = time.split(' ')
-    const normalizedTime = timePart.includes(':')
+    const normalizedTime = (timePart ?? '').includes(':')
       ? timePart
-      : `${timePart.padStart(2, '0')}:00`
+      : `${(timePart ?? '').padStart(2, '0')}:00`
     return new Date(`${date}T${normalizedTime}:00`).getTime()
   }
   return new Date(time).getTime()
 }
 
-async function getLinkViews() {
+async function getLinkViews(signal?: AbortSignal) {
   views.value = []
   const { startAt, endAt } = effectiveTimeRange.value
   const result = await useAPI<{ data: ViewDataPoint[] }>('/api/stats/views', {
@@ -92,6 +93,7 @@ async function getLinkViews() {
       endAt,
       ...effectiveFilters.value,
     },
+    signal,
   })
   views.value = (result.data || []).map((item) => {
     item.visitors = +item.visitors
@@ -100,10 +102,21 @@ async function getLinkViews() {
   })
 }
 
-watch(
+watchDeep(
   [effectiveTimeRange, effectiveFilters],
-  getLinkViews,
-  { deep: true },
+  async () => {
+    const controller = new AbortController()
+    onWatcherCleanup(() => controller.abort())
+
+    try {
+      await getLinkViews(controller.signal)
+    }
+    catch (e) {
+      if (e instanceof Error && e.name === 'AbortError')
+        return
+      throw e
+    }
+  },
 )
 
 onMounted(async () => {
@@ -154,7 +167,7 @@ type Data = ViewDataPoint
             :y="categories.map(cat => (d: Data) => d[cat as keyof Data] as number)"
             :color="categories.map(cat => chartConfig[cat]?.color ?? 'var(--chart-1)')"
             :rounded-corners="4"
-            :group-width="getUnit(startAt, endAt) === 'minute' ? 8 : undefined"
+            :group-width="getUnit(startAt ?? 0, endAt ?? 0) === 'minute' ? 8 : undefined"
           />
         </template>
 

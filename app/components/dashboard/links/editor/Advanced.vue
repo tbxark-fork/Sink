@@ -40,7 +40,7 @@ const defaultOpenItems = computed(() => {
   <Accordion type="multiple" :default-value="defaultOpenItems" class="w-full">
     <AccordionItem value="expiration">
       <AccordionTrigger>{{ $t('links.form.expiration') }}</AccordionTrigger>
-      <AccordionContent>
+      <AccordionContent class="px-1">
         <props.form.Field v-slot="{ field }" name="expiration">
           <Field :data-invalid="isInvalid(field)">
             <Popover v-model:open="datePickerOpen">
@@ -85,7 +85,7 @@ const defaultOpenItems = computed(() => {
 
     <AccordionItem value="og">
       <AccordionTrigger>{{ $t('links.form.og_settings') }}</AccordionTrigger>
-      <AccordionContent>
+      <AccordionContent class="px-1">
         <FieldGroup>
           <props.form.Field v-slot="{ field }" name="title">
             <Field>
@@ -124,7 +124,7 @@ const defaultOpenItems = computed(() => {
               <FieldLabel :for="field.name">
                 {{ $t('links.form.og_image') }}
               </FieldLabel>
-              <DashboardLinksImageUploader
+              <DashboardLinksEditorImageUploader
                 :model-value="field.state.value"
                 :slug="currentSlug"
                 @update:model-value="field.handleChange($event || '')"
@@ -137,7 +137,7 @@ const defaultOpenItems = computed(() => {
 
     <AccordionItem value="device">
       <AccordionTrigger>{{ $t('links.form.device_redirect') }}</AccordionTrigger>
-      <AccordionContent>
+      <AccordionContent class="px-1">
         <FieldGroup>
           <props.form.Field
             v-slot="{ field }"
@@ -153,7 +153,8 @@ const defaultOpenItems = computed(() => {
                 :name="field.name"
                 :model-value="field.state.value"
                 :aria-invalid="getAriaInvalid(field)"
-                placeholder="https://play.google.com/store/apps/..."
+                placeholder="https://play.google.com/store/apps/…"
+                autocomplete="off"
                 @blur="field.handleBlur"
                 @input="field.handleChange(($event.target as HTMLInputElement).value)"
               />
@@ -178,7 +179,8 @@ const defaultOpenItems = computed(() => {
                 :name="field.name"
                 :model-value="field.state.value"
                 :aria-invalid="getAriaInvalid(field)"
-                placeholder="https://apps.apple.com/app/..."
+                placeholder="https://apps.apple.com/app/…"
+                autocomplete="off"
                 @blur="field.handleBlur"
                 @input="field.handleChange(($event.target as HTMLInputElement).value)"
               />

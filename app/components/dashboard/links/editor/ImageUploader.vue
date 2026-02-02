@@ -4,25 +4,23 @@ import { toast } from 'vue-sonner'
 import { IMAGE_ALLOWED_TYPES, IMAGE_MAX_SIZE } from '@/utils/image'
 
 const props = defineProps<{
-  modelValue?: string
   slug: string
 }>()
 
-const emit = defineEmits<{
-  'update:modelValue': [value: string | undefined]
-}>()
+const imageUrl = defineModel<string>()
 
 const { t } = useI18n()
+const canUpload = computed(() => !!props.slug?.trim())
 const uploading = ref(false)
 const dragOver = ref(false)
-const fileInput = ref<HTMLInputElement>()
-
-const imageUrl = computed({
-  get: () => props.modelValue,
-  set: value => emit('update:modelValue', value),
-})
+const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 
 async function handleFile(file: File) {
+  if (!canUpload.value) {
+    toast.error(t('links.form.slug_required'))
+    return
+  }
+
   if (!IMAGE_ALLOWED_TYPES.includes(file.type)) {
     toast.error(t('links.form.image_invalid_type'))
     return
@@ -95,16 +93,17 @@ function openFilePicker() {
     <div
       v-if="!imageUrl"
       class="
-        relative flex h-32 cursor-pointer items-center justify-center rounded-md
-        border-2 border-dashed transition-colors
+        relative flex aspect-[1200/630] cursor-pointer items-center
+        justify-center rounded-md border-2 border-dashed transition-colors
       "
       :class="[
+        !canUpload ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         dragOver ? 'border-primary bg-primary/5' : `
           border-muted-foreground/25
           hover:border-primary/50
         `,
       ]"
-      @click="openFilePicker"
+      @click="canUpload && openFilePicker()"
       @drop.prevent="onDrop"
       @dragover.prevent="onDragOver"
       @dragleave="onDragLeave"
@@ -112,8 +111,8 @@ function openFilePicker() {
       <div class="flex flex-col items-center gap-1 text-muted-foreground">
         <Loader2 v-if="uploading" class="h-8 w-8 animate-spin" />
         <ImagePlus v-else class="h-8 w-8" />
-        <span class="text-sm">{{ $t('links.form.image_upload_hint') }}</span>
-        <span class="text-xs opacity-60">{{ $t('links.form.image_ratio_hint') }}</span>
+        <span class="text-sm">{{ canUpload ? $t('links.form.image_upload_hint') : $t('links.form.slug_required') }}</span>
+        <span v-if="canUpload" class="text-xs opacity-60">{{ $t('links.form.image_ratio_hint') }}</span>
       </div>
       <input
         ref="fileInput"
@@ -124,11 +123,11 @@ function openFilePicker() {
       >
     </div>
 
-    <div v-else class="relative">
+    <div v-else class="relative aspect-[1200/630]">
       <img
         :src="imageUrl"
         alt="Preview"
-        class="h-32 w-full rounded-md object-cover"
+        class="aspect-[1200/630] w-full rounded-md object-cover"
       >
       <Button
         type="button"

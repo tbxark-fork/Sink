@@ -23,8 +23,7 @@ const SOCIAL_BOTS = [
 
 function isSocialBot(userAgent: string): boolean {
   const ua = userAgent.toLowerCase()
-  const matchesBot = SOCIAL_BOTS.some(bot => ua.includes(bot))
-  return matchesBot
+  return SOCIAL_BOTS.some(bot => ua.includes(bot))
 }
 
 function getDeviceRedirectUrl(userAgent: string, link: z.infer<typeof LinkSchema>): string | null {

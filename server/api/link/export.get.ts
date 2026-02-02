@@ -1,4 +1,4 @@
-import type { Link } from '@@/app/types'
+import type { Link } from '@@/schemas/link'
 
 interface ExportData {
   version: string

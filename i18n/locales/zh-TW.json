@@ -242,7 +242,8 @@
       "image_upload_success": "圖片上傳成功",
       "image_upload_failed": "圖片上傳失敗",
       "image_upload_hint": "點擊或拖曳上傳圖片",
-      "image_ratio_hint": "建議尺寸：1200×630"
+      "image_ratio_hint": "建議尺寸：1200×630",
+      "slug_required": "請先輸入短連結"
     },
     "sort": {
       "newest": "最新",

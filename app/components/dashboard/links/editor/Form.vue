@@ -53,13 +53,13 @@ const form = useForm({
         description: value.description || undefined,
         image: value.image || undefined,
       }
-      const { link: newLink } = await useAPI(
+      const { link: newLink } = await useAPI<{ link: Link }>(
         props.isEdit ? '/api/link/edit' : '/api/link/create',
         {
           method: props.isEdit ? 'PUT' : 'POST',
           body: linkData,
         },
-      ) as { link: Link }
+      )
       emit('success', newLink)
       toast(props.isEdit ? t('links.update_success') : t('links.create_success'))
     }
@@ -132,7 +132,7 @@ async function aiSlug() {
   }
 }
 
-const currentSlug = computed(() => form.getFieldValue('slug') || 'temp')
+const currentSlug = form.useStore(state => state.values.slug || '')
 
 const { previewMode } = useRuntimeConfig().public
 
@@ -168,6 +168,7 @@ defineExpose({ randomSlug })
             :model-value="field.state.value"
             :aria-invalid="getAriaInvalid(field)"
             placeholder="https://example.com"
+            autocomplete="url"
             @blur="field.handleBlur"
             @input="field.handleChange(($event.target as HTMLInputElement).value)"
           />
@@ -189,15 +190,28 @@ defineExpose({ randomSlug })
               {{ $t('links.form.slug') }}
             </FieldLabel>
             <div v-if="!isEdit" class="flex space-x-3">
-              <Shuffle
-                class="h-4 w-4 cursor-pointer"
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-auto w-auto p-0"
+                aria-label="Generate random slug"
                 @click="randomSlug"
-              />
-              <Sparkles
-                class="h-4 w-4 cursor-pointer"
-                :class="{ 'animate-bounce': aiSlugPending }"
+              >
+                <Shuffle class="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-auto w-auto p-0"
+                aria-label="Generate AI slug"
+                :disabled="aiSlugPending"
                 @click="aiSlug"
-              />
+              >
+                <Sparkles
+                  class="h-4 w-4"
+                  :class="{ 'animate-bounce': aiSlugPending }"
+                />
+              </Button>
             </div>
           </div>
           <Input
@@ -207,6 +221,7 @@ defineExpose({ randomSlug })
             :disabled="isEdit"
             :aria-invalid="getAriaInvalid(field)"
             placeholder="my-short-link"
+            autocomplete="off"
             @blur="field.handleBlur"
             @input="field.handleChange(($event.target as HTMLInputElement).value)"
           />

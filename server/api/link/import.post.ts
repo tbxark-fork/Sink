@@ -41,6 +41,17 @@ export default eventHandler(async (event) => {
   for (let i = 0; i < importData.links.length; i++) {
     const linkData = importData.links[i]
 
+    if (!linkData) {
+      result.failed++
+      result.failedItems.push({
+        index: i,
+        slug: '',
+        url: '',
+        reason: 'Missing link data',
+      })
+      continue
+    }
+
     try {
       const slug = normalizeSlug(event, linkData.slug)
       const existingLink = await getLink(event, slug)
