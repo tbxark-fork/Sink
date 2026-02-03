@@ -31,26 +31,21 @@ tests/                  # Vitest tests
 
 ## Commands
 
-Use **pnpm** (v10+) with **Node.js 20.11+**.
+Use **pnpm** (v10+) with **Node.js 22+**.
 
 ```bash
-# Development
-pnpm dev                  # Start dev server on port 7465
-pnpm preview              # Worker preview via wrangler
-
-# Building
+pnpm dev                  # Start dev server (port 7465)
 pnpm build                # Production build
-
-# Linting & Type Checking
+pnpm preview              # Worker preview via wrangler
 pnpm lint:fix             # ESLint with auto-fix
 pnpm types:check          # TypeScript type check
 
 # Testing (Vitest + Cloudflare Workers pool)
-pnpm vitest               # Run all tests
-pnpm vitest run           # Run tests once (CI mode)
-pnpm vitest tests/sink.spec.ts           # Run single test file
-pnpm vitest -t "returns 200"             # Run tests matching pattern
-pnpm vitest tests/api/                   # Run tests in directory
+pnpm vitest               # Watch mode
+pnpm vitest run           # CI mode (run once)
+pnpm vitest tests/sink.spec.ts           # Single file
+pnpm vitest tests/api/link.spec.ts       # Single API test
+pnpm vitest -t "returns 200"             # Pattern match
 
 # Deployment
 pnpm deploy:pages         # Deploy to Cloudflare Pages
@@ -59,30 +54,19 @@ pnpm deploy:worker        # Deploy to Cloudflare Workers
 
 ## Code Style
 
-Uses `@antfu/eslint-config` with Tailwind CSS linting.
+Uses `@antfu/eslint-config`. Run `pnpm lint:fix` before committing.
 
-### General Rules
-
-- **Indentation**: 2 spaces
-- **Quotes**: Single quotes
-- **Semicolons**: None
-- **Trailing commas**: Always
+- **Indentation**: 2 spaces | **Quotes**: Single | **Semicolons**: None | **Trailing commas**: Always
 
 ### TypeScript
 
-- Use TypeScript for all code
-- Prefer `interface` for objects, `type` for unions
+- Use TypeScript for all code; prefer `interface` for objects, `type` for unions
 - Avoid `any`; use proper types or `unknown`
 - Use Zod for runtime validation (see `schemas/`)
 
 ```typescript
-interface Link {
-  id: string
-  url: string
-  slug: string
-}
+interface Link { id: string, url: string, slug: string }
 
-// Zod schema
 export const LinkSchema = z.object({
   id: z.string().trim().max(26),
   url: z.string().trim().url().max(2048),
@@ -92,10 +76,7 @@ export const LinkSchema = z.object({
 
 ### Vue Components
 
-- Use `<script setup lang="ts">` always
-- Files: PascalCase (`LinkEditor.vue`)
-- Props: `defineProps<{ ... }>()`
-- Emits: `defineEmits<{ ... }>()`
+Use `<script setup lang="ts">` always. Files: PascalCase (`LinkEditor.vue`).
 
 ```vue
 <script setup lang="ts">
@@ -113,10 +94,7 @@ const emit = defineEmits<{ update: [link: Link] }>()
 ### Imports
 
 - **Prefer Nuxt auto-imports** (`ref`, `computed`, `useFetch`, etc.)
-- Explicit imports for:
-  - External libraries: `import { z } from 'zod'`
-  - Types: `import type { Link } from '@/types'`
-  - Icons: `import { Copy } from 'lucide-vue-next'`
+- Explicit imports: external libs (`import { z } from 'zod'`), types (`import type { Link } from '@/types'`), icons (`import { Copy } from 'lucide-vue-next'`)
 - Path aliases: `@/` (app), `@@/` (root)
 
 ### Naming Conventions
@@ -134,10 +112,9 @@ const emit = defineEmits<{ update: [link: Link] }>()
 ### Error Handling
 
 ```typescript
-// Server API
+// Server API - use createError for HTTP errors
 export default eventHandler(async (event) => {
   const link = await readValidatedBody(event, LinkSchema.parse)
-
   if (existingLink) {
     throw createError({ status: 409, statusText: 'Link already exists' })
   }
@@ -149,50 +126,45 @@ export default eventHandler(async (event) => {
 Access via `event.context.cloudflare.env`:
 
 ```typescript
-const { KV, ANALYTICS, AI } = event.context.cloudflare.env
+const { KV, ANALYTICS, AI, R2 } = event.context.cloudflare.env
 ```
 
-- `KV`: Workers KV for link storage
-- `ANALYTICS`: Analytics Engine
-- `AI`: Workers AI for slug generation
+| Binding     | Type             | Purpose                    |
+| ----------- | ---------------- | -------------------------- |
+| `KV`        | Workers KV       | Link storage               |
+| `ANALYTICS` | Analytics Engine | Click tracking & analytics |
+| `AI`        | Workers AI       | AI-powered slug generation |
+| `R2`        | R2 Bucket        | Data backup & file storage |
 
 ## UI Components
 
-- Use shadcn-vue from `app/components/ui/`
-- **Never edit** `components/ui/` directly (auto-generated)
+- Use shadcn-vue from `app/components/ui/` — **Never edit** (auto-generated)
 - Use `ResponsiveModal` for mobile-optimized dialogs
 - Use Tailwind CSS v4 for styling
 
 ## Accessibility
 
-- Use static English for `aria-label` (no `$t()` translations)
+Use static English for `aria-label` (no `$t()` translations):
 
 ```vue
-<!-- Good -->
 <button aria-label="Open menu">
 ...
-</button>
+</button>  <!-- Good -->
 
-<!-- Bad -->
 <button :aria-label="$t('menu.open')">
 ...
-</button>
+</button>  <!-- Bad -->
 ```
 
 ## Commits
 
-Follow Conventional Commits:
+Follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`
 
 ```
 feat: add link expiration
 fix: correct analytics filter
-docs: update API docs
-chore(deps): bump dependencies
-refactor: simplify store logic
 ```
 
 ## Pre-commit
 
-- `simple-git-hooks` runs `lint-staged` on commit
-- Auto-runs `eslint --fix` on staged files
-- Run `pnpm lint:fix` before committing
+`simple-git-hooks` runs `lint-staged` on commit, auto-runs `eslint --fix` on staged files.

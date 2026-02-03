@@ -1,6 +1,5 @@
 import type { LinkSchema } from '@@/schemas/link'
 import type { z } from 'zod'
-import { UAParser } from 'ua-parser-js'
 import { parsePath, withQuery } from 'ufo'
 
 const SOCIAL_BOTS = [
@@ -30,19 +29,14 @@ function getDeviceRedirectUrl(userAgent: string, link: z.infer<typeof LinkSchema
   if (!link.apple && !link.google)
     return null
 
-  const parser = new UAParser(userAgent)
-  const result = parser.getResult()
-  const os = result.os?.name?.toLowerCase() || ''
-  const deviceType = result.device?.type
+  const ua = userAgent.toLowerCase()
 
-  if (os === 'android' && link.google) {
+  if (link.google && ua.includes('android')) {
     return link.google
   }
 
-  if ((os === 'ios' || os === 'mac os') && link.apple) {
-    if (deviceType === 'mobile' || deviceType === 'tablet' || os === 'ios') {
-      return link.apple
-    }
+  if (link.apple && (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod'))) {
+    return link.apple
   }
 
   return null

@@ -95,11 +95,11 @@ async function getLinkViews(signal?: AbortSignal) {
     },
     signal,
   })
-  views.value = (result.data || []).map((item) => {
-    item.visitors = +item.visitors
-    item.visits = +item.visits
-    return item
-  })
+  views.value = (result.data || []).map(item => ({
+    ...item,
+    visitors: +item.visitors,
+    visits: +item.visits,
+  }))
 }
 
 watchDeep(
@@ -129,19 +129,10 @@ type Data = ViewDataPoint
 <template>
   <Card
     class="
-      px-0 py-6
-      md:px-6
+      p-4
+      md:p-10
     "
   >
-    <CardTitle
-      v-if="mode === 'full'"
-      class="
-        px-6
-        md:px-0
-      "
-    >
-      {{ $t('dashboard.views') }}
-    </CardTitle>
     <ChartContainer :config="chartConfig" class="aspect-[4/1] w-full">
       <VisXYContainer :data="views" :margin="{ left: 0, right: 0 }">
         <template v-if="isAreaMode">
@@ -188,9 +179,6 @@ type Data = ViewDataPoint
           :color="categories.map(cat => chartConfig[cat]?.color ?? 'var(--chart-1)')"
         />
       </VisXYContainer>
-
-      <!-- Legend -->
-      <ChartLegendContent v-if="mode === 'full'" />
     </ChartContainer>
   </Card>
 </template>

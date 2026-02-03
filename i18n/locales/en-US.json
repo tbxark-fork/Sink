@@ -150,6 +150,8 @@
     "visitors": "Visitors",
     "referers": "Referers",
     "stats": "'s Stats",
+    "trend": "Trend",
+    "weekly_trend": "Weekly Trend",
     "custom_date": "Custom Date",
     "date": "Date",
     "date_range": "Date Range",

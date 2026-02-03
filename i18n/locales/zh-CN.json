@@ -150,6 +150,8 @@
     "visitors": "访客数",
     "referers": "引荐来源",
     "stats": "的统计",
+    "trend": "趋势",
+    "weekly_trend": "周度趋势",
     "custom_date": "自定义日期",
     "date": "日期",
     "date_range": "日期范围",

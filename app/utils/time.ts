@@ -45,3 +45,12 @@ export function date2unix(dateValue: DateValue | Date, type?: string) {
 export function unix2date(unix: number) {
   return toCalendarDate(fromAbsolute(unix * 1000, getTimeZone()))
 }
+
+export function getWeekdayNames(style: 'long' | 'short' | 'narrow' = 'short') {
+  const formatter = new Intl.DateTimeFormat(undefined, { weekday: style })
+  // 2024-01-01 is Monday
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(2024, 0, 1 + i)
+    return formatter.format(date)
+  })
+}
