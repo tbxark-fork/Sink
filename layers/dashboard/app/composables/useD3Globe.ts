@@ -3,7 +3,7 @@ import type { GeoPath, GeoPermissibleObjects, GeoProjection } from 'd3-geo'
 import type { Timer } from 'd3-timer'
 import type { Ref } from 'vue'
 import { drag } from 'd3-drag'
-import { easeCubicIn, easeCubicOut } from 'd3-ease'
+import { easeCubicOut } from 'd3-ease'
 import { geoCircle, geoInterpolate, geoOrthographic, geoPath } from 'd3-geo'
 import { select } from 'd3-selection'
 import { timer } from 'd3-timer'
@@ -64,8 +64,8 @@ export function useD3Globe(
   let projection: GeoProjection | null = null
   let pathGenerator: GeoPath<any, GeoPermissibleObjects> | null = null
   let rotationTimer: Timer | null = null
-  const activeArcs = new Map<symbol, Timer>()
-  const activeRipples = new Map<symbol, Timer>()
+  const activeArcs = new Map<symbol, { timer: Timer, element: any, points: [number, number][], progress: number }>()
+  const activeRipples = new Map<symbol, { timer: Timer, element: any, center: [number, number], currentRadius: number }>()
 
   // Computed radius based on container size
   const radius = computed(() => Math.min(config.value.width, config.value.height) / 2.2)
@@ -90,6 +90,28 @@ export function useD3Globe(
       .scale(radius.value * scale.value)
       .translate([config.value.width / 2, config.value.height / 2])
       .rotate(rotation.value)
+
+    // Update active arcs to follow globe rotation
+    if (pathGenerator) {
+      activeArcs.forEach(({ element, points, progress }) => {
+        const pointIndex = Math.floor(progress * (points.length - 1))
+        const currentPoints = points.slice(0, pointIndex + 1)
+        if (currentPoints.length >= 2) {
+          const line: GeoJSON.LineString = {
+            type: 'LineString',
+            coordinates: currentPoints,
+          }
+          element.attr('d', pathGenerator!(line))
+        }
+      })
+
+      // Update active ripples to follow globe rotation
+      const circleGenerator = geoCircle()
+      activeRipples.forEach(({ element, center, currentRadius }) => {
+        circleGenerator.center(center).radius(currentRadius)
+        element.attr('d', pathGenerator!(circleGenerator()))
+      })
+    }
   }
 
   // Setup drag behavior with inertia
@@ -235,6 +257,9 @@ export function useD3Globe(
       .attr('stroke-linecap', 'round')
       .attr('opacity', 0.9)
 
+    // Store arc data for projection updates
+    const arcState = { timer: null as unknown as Timer, element: arcPath, points: arcPoints, progress: 0 }
+
     let startTime: number | null = null
 
     const arcTimer = timer((elapsed) => {
@@ -243,6 +268,9 @@ export function useD3Globe(
 
       const rawProgress = Math.min((elapsed - startTime) / duration, 1)
       const easedProgress = easeCubicOut(rawProgress)
+
+      // Update stored progress for projection updates
+      arcState.progress = easedProgress
 
       // Use cached arc points based on eased progress
       const pointIndex = Math.floor(easedProgress * numPoints)
@@ -257,18 +285,21 @@ export function useD3Globe(
       }
 
       if (rawProgress >= 1) {
-        // Fade out
+        // Fade out - delay removal from activeArcs until transition ends
         arcPath.transition()
           .duration(500)
           .attr('opacity', 0)
-          .remove()
+          .on('end', () => {
+            arcPath.remove()
+            activeArcs.delete(id)
+          })
 
         arcTimer.stop()
-        activeArcs.delete(id)
       }
     })
 
-    activeArcs.set(id, arcTimer)
+    arcState.timer = arcTimer
+    activeArcs.set(id, arcState)
     return id
   }
 
@@ -293,6 +324,9 @@ export function useD3Globe(
       .attr('fill', rippleData.color ?? 'var(--chart-2)')
       .attr('fill-opacity', 0.15)
 
+    // Store ripple data for projection updates
+    const rippleState = { timer: null as unknown as Timer, element: ripplePath, center, currentRadius: 0 }
+
     let startTime: number | null = null
 
     const rippleTimer = timer((elapsed) => {
@@ -303,11 +337,14 @@ export function useD3Globe(
 
       // Use easing for smooth animations
       const easedRadiusProgress = easeCubicOut(rawProgress)
-      const easedOpacityProgress = easeCubicIn(rawProgress)
 
       const currentRadius = easedRadiusProgress * maxRadius
-      const strokeOpacity = 0.8 * (1 - easedOpacityProgress)
-      const fillOpacity = 0.15 * (1 - easedOpacityProgress)
+      // Update stored radius for projection updates
+      rippleState.currentRadius = currentRadius
+
+      // Use radius progress for opacity - outer circles are lighter
+      const strokeOpacity = 0.6 * (1 - easedRadiusProgress) ** 2
+      const fillOpacity = 0.15 * (1 - easedRadiusProgress)
 
       ripplePath
         .attr('d', pathGenerator!(circleGenerator.radius(currentRadius)()))
@@ -321,7 +358,8 @@ export function useD3Globe(
       }
     })
 
-    activeRipples.set(id, rippleTimer)
+    rippleState.timer = rippleTimer
+    activeRipples.set(id, rippleState)
     return id
   }
 
@@ -346,8 +384,8 @@ export function useD3Globe(
     stopAutoRotate()
     stopInertia()
     cleanup()
-    activeArcs.forEach(t => t.stop())
-    activeRipples.forEach(t => t.stop())
+    activeArcs.forEach(arc => arc.timer.stop())
+    activeRipples.forEach(ripple => ripple.timer.stop())
     activeArcs.clear()
     activeRipples.clear()
   }

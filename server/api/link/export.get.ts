@@ -1,4 +1,4 @@
-import type { ExportData, Link } from '@@/schemas/link'
+import type { ExportData, Link } from '#shared/schemas/link'
 
 export default eventHandler(async (event) => {
   const query = getQuery(event)

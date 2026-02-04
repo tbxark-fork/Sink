@@ -1,4 +1,4 @@
-import { LinkSchema } from '@@/schemas/link'
+import { LinkSchema } from '#shared/schemas/link'
 
 defineRouteMeta({
   openAPI: {

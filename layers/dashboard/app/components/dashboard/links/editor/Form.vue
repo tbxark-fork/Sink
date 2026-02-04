@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AnyFieldApi, Link, LinkFormData } from '@/types'
-import { LinkSchema, nanoid } from '@@/schemas/link'
+import { LinkSchema, nanoid } from '#shared/schemas/link'
 import { useForm } from '@tanstack/vue-form'
 import { Shuffle, Sparkles } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'

@@ -1,5 +1,3 @@
-import { useEventBus } from '@vueuse/core'
-
 export interface TrafficEventParams {
   props: {
     item: {
@@ -10,5 +8,3 @@ export interface TrafficEventParams {
     }
   }
 }
-
-export const globalTrafficEvent = useEventBus<TrafficEventParams>(Symbol('traffic'))

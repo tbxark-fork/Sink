@@ -1,4 +1,4 @@
-import type { Link } from '@@/schemas/link'
+import type { Link } from '#shared/schemas/link'
 import type { DateValue } from '@internationalized/date'
 import type { AnyFieldApi } from '@tanstack/vue-form'
 

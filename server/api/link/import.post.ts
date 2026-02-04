@@ -1,6 +1,6 @@
-import type { ImportResult } from '@@/schemas/import'
-import { ImportDataSchema } from '@@/schemas/import'
-import { nanoid } from '@@/schemas/link'
+import type { ImportResult } from '#shared/schemas/import'
+import { ImportDataSchema } from '#shared/schemas/import'
+import { nanoid } from '#shared/schemas/link'
 
 export default eventHandler(async (event) => {
   const kvBatchLimit = useRuntimeConfig(event).public.kvBatchLimit as string

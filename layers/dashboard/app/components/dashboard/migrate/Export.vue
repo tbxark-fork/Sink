@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Link } from '@@/app/types'
+import type { Link } from '@/types'
 import { Download, Loader } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 

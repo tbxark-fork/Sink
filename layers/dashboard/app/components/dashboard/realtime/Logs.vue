@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { LogEvent } from '@/types'
-import type { TrafficEventParams } from '@/utils/events'
+import type { LogEvent, TrafficEventParams } from '@/types'
+
+const trafficEventBus = useTrafficEventBus()
 
 const realtimeStore = useDashboardRealtimeStore()
 const logs = shallowRef<LogEvent[]>([])
@@ -31,7 +32,7 @@ onMounted(async () => {
 
 function onUpdateItems(item: unknown, props: { delay?: number }) {
   if (item && typeof item === 'object' && 'props' in item) {
-    globalTrafficEvent.emit(item as TrafficEventParams, props)
+    trafficEventBus.emit(item as TrafficEventParams, props)
   }
 }
 </script>

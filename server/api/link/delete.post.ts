@@ -1,4 +1,4 @@
-import { LinkSchema } from '@@/schemas/link'
+import { LinkSchema } from '#shared/schemas/link'
 import { z } from 'zod'
 
 const DeleteSchema = z.object({

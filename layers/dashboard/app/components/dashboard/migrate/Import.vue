@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { ImportData } from '@@/schemas/import'
-import { ImportDataSchema } from '@@/schemas/import'
+import type { ImportData } from '#shared/schemas/import'
+import { ImportDataSchema } from '#shared/schemas/import'
 import { AlertCircle, CheckCircle, Download, SkipForward, Upload, XCircle } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
@@ -227,6 +227,7 @@ function reset() {
           ref="fileInput"
           type="file"
           accept=".json"
+          class="cursor-pointer"
           @change="handleFileSelect"
         />
       </div>
