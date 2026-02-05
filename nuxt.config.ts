@@ -50,6 +50,13 @@ export default defineNuxtConfig({
   experimental: {
     enforceModuleCompatibility: true,
   },
+  typescript: {
+    tsConfig: {
+      compilerOptions: {
+        types: ['vite/client'],
+      },
+    },
+  },
   compatibilityDate: 'latest',
   nitro: {
     preset: !import.meta.env.CI ? 'cloudflare-module' : undefined,
@@ -78,6 +85,9 @@ export default defineNuxtConfig({
     plugins: [
       tailwindcss(),
     ],
+    worker: {
+      format: 'es',
+    },
   },
   eslint: {
     config: {

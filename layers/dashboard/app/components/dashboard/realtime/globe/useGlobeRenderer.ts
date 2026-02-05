@@ -1,4 +1,5 @@
 import type { GlobeConfig } from '#layers/dashboard/app/composables/useD3Globe'
+import type { VisiblePoint } from '#layers/dashboard/app/composables/useGlobeWorker'
 import type { GeoPermissibleObjects, GeoProjection } from 'd3-geo'
 import type { ComputedRef, Ref, ShallowRef } from 'vue'
 import type { GeoJSONData, LocationData } from '@/types'
@@ -6,7 +7,6 @@ import { color as d3Color } from 'd3-color'
 import { geoGraticule, geoPath } from 'd3-geo'
 import { scaleSequentialSqrt } from 'd3-scale'
 import { interpolateYlOrRd } from 'd3-scale-chromatic'
-import { timer } from 'd3-timer'
 
 export interface GlobeColors {
   globeFill: string
@@ -68,6 +68,9 @@ export interface GlobeRendererContext {
   countryColorTiers: ComputedRef<CountryColorTiers>
   getProjection: () => GeoProjection | null
   updateProjection: () => void
+  getRotation: () => [number, number]
+  getScale: () => number
+  getRadius: () => number
 }
 
 export function useGlobeRenderer(ctx: GlobeRendererContext) {
@@ -75,10 +78,37 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
   let canvasWidth = 0
   let canvasHeight = 0
   let canvasDpr = 1
-  let renderTimer: ReturnType<typeof timer> | null = null
+  let animationFrameId: number | null = null
+
+  // Dirty flag for conditional rendering
+  let isDirty = true
 
   // Graticule generator - reuse instance
   const graticule = geoGraticule()
+  // Cache graticule GeoJSON - only regenerate when needed
+  let cachedGraticuleGeoJSON: ReturnType<typeof graticule> | null = null
+
+  // Path2D cache for static geometry
+  let cachedSpherePath: Path2D | null = null
+  let cachedGraticulePath: Path2D | null = null
+  let cachedCountryPaths: Map<string, Path2D> | null = null
+  let cachedCountryStrokePath: Path2D | null = null
+
+  // Cache invalidation tracking
+  let lastCacheRotation: [number, number] = [0, 0]
+  let lastCacheScale = 0
+  let lastCacheWidth = 0
+  let lastCacheHeight = 0
+
+  // Worker results buffer
+  let visiblePoints: VisiblePoint[] = []
+
+  // Weight color scale for fallback rendering
+  const weightColor = computed(() => {
+    // Ensure domain is valid (avoid [0,0] which causes NaN)
+    const domainMax = ctx.highest.value > 0 ? ctx.highest.value * 3 : 1
+    return scaleSequentialSqrt(interpolateYlOrRd).domain([0, domainMax])
+  })
 
   // Cache country groups by color tier
   const countryGroups = computed(() => {
@@ -112,12 +142,6 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
     return groups
   })
 
-  // Weight color scale
-  const weightColor = computed(() => {
-    const domainMax = ctx.highest.value * 3
-    return scaleSequentialSqrt(interpolateYlOrRd).domain([0, domainMax])
-  })
-
   function updateCanvasSize() {
     const canvas = ctx.canvasRef.value
     if (!canvas)
@@ -138,6 +162,85 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
     canvas.height = h * dpr
     canvas.style.width = `${w}px`
     canvas.style.height = `${h}px`
+
+    // Invalidate caches on resize
+    invalidatePathCache()
+    markDirty()
+  }
+
+  function invalidatePathCache() {
+    cachedSpherePath = null
+    cachedGraticulePath = null
+    cachedCountryPaths = null
+    cachedCountryStrokePath = null
+  }
+
+  function shouldUpdateCache(): boolean {
+    const rotation = ctx.getRotation()
+    const scale = ctx.getScale()
+    const w = ctx.config.value.width
+    const h = ctx.config.value.height
+
+    // Check if projection parameters changed significantly
+    const rotationChanged = Math.abs(rotation[0] - lastCacheRotation[0]) > 0.01
+      || Math.abs(rotation[1] - lastCacheRotation[1]) > 0.01
+    const scaleChanged = Math.abs(scale - lastCacheScale) > 0.001
+    const sizeChanged = w !== lastCacheWidth || h !== lastCacheHeight
+
+    if (rotationChanged || scaleChanged || sizeChanged) {
+      lastCacheRotation = [...rotation]
+      lastCacheScale = scale
+      lastCacheWidth = w
+      lastCacheHeight = h
+      return true
+    }
+
+    return false
+  }
+
+  function buildPathCache(projection: GeoProjection) {
+    // Initialize graticule GeoJSON once
+    if (!cachedGraticuleGeoJSON) {
+      cachedGraticuleGeoJSON = graticule()
+    }
+
+    // Create path generator (reused for building cache)
+    const pathGen = geoPath(projection)
+
+    // Build sphere path
+    cachedSpherePath = new Path2D(pathGen({ type: 'Sphere' }) || '')
+
+    // Build graticule path
+    cachedGraticulePath = new Path2D(pathGen(cachedGraticuleGeoJSON) || '')
+
+    // Build country paths grouped by fill color
+    cachedCountryPaths = new Map()
+    countryGroups.value.forEach((features, fill) => {
+      const path = new Path2D()
+      features.forEach((feature) => {
+        const d = pathGen(feature)
+        if (d)
+          path.addPath(new Path2D(d))
+      })
+      cachedCountryPaths!.set(fill, path)
+    })
+
+    // Build country stroke path (all countries combined)
+    cachedCountryStrokePath = new Path2D()
+    ctx.countries.value.features.forEach((feature) => {
+      const d = pathGen(feature as GeoPermissibleObjects)
+      if (d)
+        cachedCountryStrokePath!.addPath(new Path2D(d))
+    })
+  }
+
+  function markDirty() {
+    isDirty = true
+  }
+
+  function setVisiblePoints(points: VisiblePoint[]) {
+    visiblePoints = points
+    markDirty()
   }
 
   function render() {
@@ -156,82 +259,91 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
     if (!canvasCtx)
       return
 
+    // Check if path cache needs update
+    if (shouldUpdateCache() || !cachedSpherePath) {
+      buildPathCache(projection)
+    }
+
+    // Clear and setup transform
     canvasCtx.setTransform(1, 0, 0, 1, 0, 0)
     canvasCtx.clearRect(0, 0, canvas.width, canvas.height)
     canvasCtx.scale(canvasDpr, canvasDpr)
 
-    const path = geoPath(projection, canvasCtx)
     const currentColors = ctx.colors.value
 
-    // Draw globe background
-    canvasCtx.beginPath()
-    path({ type: 'Sphere' })
-    canvasCtx.fillStyle = currentColors.globeFill
-    canvasCtx.fill()
-    canvasCtx.strokeStyle = currentColors.globeStroke
-    canvasCtx.lineWidth = 1.5
-    canvasCtx.stroke()
+    // Draw globe background (using cached Path2D)
+    if (cachedSpherePath) {
+      canvasCtx.fillStyle = currentColors.globeFill
+      canvasCtx.fill(cachedSpherePath)
+      canvasCtx.strokeStyle = currentColors.globeStroke
+      canvasCtx.lineWidth = 1.5
+      canvasCtx.stroke(cachedSpherePath)
+    }
 
-    // Draw graticule
-    canvasCtx.beginPath()
-    path(graticule())
-    canvasCtx.strokeStyle = currentColors.graticuleStroke
-    canvasCtx.lineWidth = 0.5
-    canvasCtx.stroke()
+    // Draw graticule (using cached Path2D)
+    if (cachedGraticulePath) {
+      canvasCtx.strokeStyle = currentColors.graticuleStroke
+      canvasCtx.lineWidth = 0.5
+      canvasCtx.stroke(cachedGraticulePath)
+    }
 
-    // Draw countries
-    if (ctx.countries.value.features.length > 0) {
-      countryGroups.value.forEach((features, fill) => {
-        canvasCtx.beginPath()
-        features.forEach(feature => path(feature))
+    // Draw countries (using cached Path2D)
+    if (cachedCountryPaths && cachedCountryPaths.size > 0) {
+      cachedCountryPaths.forEach((path, fill) => {
         canvasCtx.fillStyle = fill
-        canvasCtx.fill()
+        canvasCtx.fill(path)
       })
 
-      canvasCtx.beginPath()
-      ctx.countries.value.features.forEach(feature => path(feature as GeoPermissibleObjects))
-      canvasCtx.strokeStyle = currentColors.countryStroke
-      canvasCtx.lineWidth = 0.3
-      canvasCtx.stroke()
+      if (cachedCountryStrokePath) {
+        canvasCtx.strokeStyle = currentColors.countryStroke
+        canvasCtx.lineWidth = 0.3
+        canvasCtx.stroke(cachedCountryStrokePath)
+      }
     }
 
     // Draw heatmap points
-    if (ctx.locations.value.length > 0) {
-      renderHeatmapPoints(canvasCtx, projection, w, h)
+    // If Worker has returned results, use optimized rendering
+    // Otherwise fallback to main thread rendering
+    if (visiblePoints.length > 0) {
+      renderHeatmapPointsOptimized(canvasCtx)
     }
+    else if (ctx.locations.value.length > 0) {
+      // Fallback: render on main thread when Worker hasn't returned yet
+      renderHeatmapPointsFallback(canvasCtx, projection, w, h)
+    }
+
+    isDirty = false
   }
 
-  function renderHeatmapPoints(
+  // Fallback rendering for when Worker hasn't returned results yet
+  function renderHeatmapPointsFallback(
     canvasCtx: CanvasRenderingContext2D,
     projection: GeoProjection,
-    w: number,
-    h: number,
+    _w: number,
+    _h: number,
   ) {
-    const center = projection.invert?.([w / 2, h / 2])
-    const centerLat = center ? center[1] * Math.PI / 180 : 0
-    const centerLng = center ? center[0] * Math.PI / 180 : 0
+    const rotation = ctx.getRotation()
+    const centerLng = -rotation[0] * Math.PI / 180
+    const centerLat = -rotation[1] * Math.PI / 180
     const sinCenterLat = Math.sin(centerLat)
     const cosCenterLat = Math.cos(centerLat)
 
-    ctx.locations.value.forEach((loc) => {
-      // Skip points with no count
+    for (const loc of ctx.locations.value) {
       if (loc.count <= 0)
-        return
+        continue
 
       const coords = projection([loc.lng, loc.lat])
       if (!coords || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1]))
-        return
+        continue
 
-      // Check visibility
-      if (center) {
-        const pointLat = loc.lat * Math.PI / 180
-        const pointLng = loc.lng * Math.PI / 180
-        const dot = sinCenterLat * Math.sin(pointLat)
-          + cosCenterLat * Math.cos(pointLat) * Math.cos(pointLng - centerLng)
-        const distance = Math.acos(Math.min(1, Math.max(-1, dot)))
-        if (distance > Math.PI / 2)
-          return
-      }
+      // Visibility check using dot product
+      const pointLat = loc.lat * Math.PI / 180
+      const pointLng = loc.lng * Math.PI / 180
+      const dot = sinCenterLat * Math.sin(pointLat)
+        + cosCenterLat * Math.cos(pointLat) * Math.cos(pointLng - centerLng)
+
+      if (dot <= 0)
+        continue
 
       const [x, y] = coords
       const radius = Math.max(3, Math.min(12, Math.sqrt(loc.count) * 2))
@@ -260,32 +372,73 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
       canvasCtx.arc(x, y, radius * 0.6, 0, Math.PI * 2)
       canvasCtx.fillStyle = color
       canvasCtx.fill()
-    })
+    }
+  }
+
+  function renderHeatmapPointsOptimized(canvasCtx: CanvasRenderingContext2D) {
+    for (const point of visiblePoints) {
+      const { x, y, radius, r, g, b } = point
+      const glowRadius = radius * 2
+
+      // Convert normalized RGB to CSS color string (pre-computed by Worker)
+      const colorStr = `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
+      const colorHalfAlpha = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 0.5)`
+
+      // Draw glow effect
+      const gradient = canvasCtx.createRadialGradient(x, y, 0, x, y, glowRadius)
+      gradient.addColorStop(0, colorStr)
+      gradient.addColorStop(0.5, colorHalfAlpha)
+      gradient.addColorStop(1, 'transparent')
+
+      canvasCtx.beginPath()
+      canvasCtx.arc(x, y, glowRadius, 0, Math.PI * 2)
+      canvasCtx.fillStyle = gradient
+      canvasCtx.fill()
+
+      // Draw solid center
+      canvasCtx.beginPath()
+      canvasCtx.arc(x, y, radius * 0.6, 0, Math.PI * 2)
+      canvasCtx.fillStyle = colorStr
+      canvasCtx.fill()
+    }
   }
 
   function startRenderLoop() {
-    if (renderTimer)
-      renderTimer.stop()
+    if (animationFrameId !== null)
+      return
 
-    // Only render - projection updates are handled by useD3Globe (drag/zoom/autoRotate)
-    renderTimer = timer(() => {
+    function loop() {
+      // Always render when in animation loop (rotation/drag updates projection)
       render()
-    })
+      animationFrameId = requestAnimationFrame(loop)
+    }
+
+    animationFrameId = requestAnimationFrame(loop)
   }
 
   function stopRenderLoop() {
-    if (renderTimer) {
-      renderTimer.stop()
-      renderTimer = null
+    if (animationFrameId !== null) {
+      cancelAnimationFrame(animationFrameId)
+      animationFrameId = null
+    }
+  }
+
+  // Render once (for static updates)
+  function renderOnce() {
+    if (isDirty) {
+      render()
     }
   }
 
   return {
     countryGroups,
-    weightColor,
     updateCanvasSize,
     render,
+    renderOnce,
     startRenderLoop,
     stopRenderLoop,
+    markDirty,
+    setVisiblePoints,
+    invalidatePathCache,
   }
 }

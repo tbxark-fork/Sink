@@ -29,6 +29,9 @@ const globe = useD3Globe(svgRef, globeConfig)
 // Colors
 const { arcColor, colors, countryColorTiers } = useGlobeColors()
 
+// Worker for heavy computations
+const globeWorker = useGlobeWorker()
+
 // Renderer
 const renderer = useGlobeRenderer({
   canvasRef,
@@ -42,6 +45,9 @@ const renderer = useGlobeRenderer({
   countryColorTiers,
   getProjection: globe.getProjection,
   updateProjection: globe.updateProjection,
+  getRotation: globe.getRotation,
+  getScale: globe.getScale,
+  getRadius: () => globe.radius.value,
 })
 
 // Traffic events
@@ -51,10 +57,49 @@ const trafficEvent = useTrafficEvent({
   globe,
 })
 
+// Send data to worker for computation
+function updateWorkerData() {
+  if (globeData.locations.value.length === 0) {
+    // Clear visible points when data is empty
+    renderer.setVisiblePoints([])
+    return
+  }
+
+  globeWorker.computeAsync({
+    locations: globeData.locations.value,
+    width: globeConfig.value.width,
+    height: globeConfig.value.height,
+    scale: globe.scale.value,
+    rotation: globe.rotation.value,
+    radius: globe.radius.value,
+    highest: globeData.highest.value,
+  })
+}
+
+// Watch for worker results and update renderer
+watch(globeWorker.currentBuffer, (points) => {
+  renderer.setVisiblePoints(points)
+})
+
+// Watch for data changes to trigger worker computation
+watch([
+  globeData.locations,
+  globeData.highest,
+], updateWorkerData)
+
+// Watch for rotation/scale changes to update worker (throttled via worker busy state)
+watch([globe.rotation, globe.scale], updateWorkerData)
+
+// Watch for data/color changes to invalidate country path cache
+watch([globeData.countryStats, countryColorTiers, colors], () => {
+  renderer.invalidatePathCache()
+})
+
 // Resize handling
 const debouncedResize = useDebounceFn(() => {
   renderer.updateCanvasSize()
   globe.updateProjection()
+  updateWorkerData()
 }, 100)
 
 watch([width, height], debouncedResize)
@@ -65,6 +110,9 @@ function stopRotation() {
 
 // Lifecycle
 onMounted(async () => {
+  // Initialize worker
+  globeWorker.init()
+
   await globeData.init()
 
   globe.init()
@@ -75,6 +123,9 @@ onMounted(async () => {
     globe.setPointOfView(latitude, longitude)
   }
 
+  // Initial worker computation
+  updateWorkerData()
+
   renderer.startRenderLoop()
   globe.startAutoRotate()
 
@@ -83,6 +134,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   renderer.stopRenderLoop()
+  globeWorker.destroy()
   trafficEventBus.off(trafficEvent.handleTrafficEvent)
   globe.destroy()
   trafficEvent.cleanup()

@@ -39,6 +39,24 @@ export interface RippleData {
   color?: string
 }
 
+// Arc state with index-based rendering (no slice allocation)
+interface ArcState {
+  timer: Timer
+  element: any
+  points: [number, number][]
+  pointIndex: number // Current end index (avoids slice)
+  numPoints: number
+}
+
+// Ripple state
+interface RippleState {
+  timer: Timer
+  element: any
+  center: [number, number]
+  currentRadius: number
+  circleGenerator: ReturnType<typeof geoCircle> // Reuse generator
+}
+
 export function useD3Globe(
   svgRef: Ref<SVGSVGElement | null>,
   config: Ref<GlobeConfig>,
@@ -64,8 +82,17 @@ export function useD3Globe(
   let projection: GeoProjection | null = null
   let pathGenerator: GeoPath<any, GeoPermissibleObjects> | null = null
   let rotationTimer: Timer | null = null
-  const activeArcs = new Map<symbol, { timer: Timer, element: any, points: [number, number][], progress: number }>()
-  const activeRipples = new Map<symbol, { timer: Timer, element: any, center: [number, number], currentRadius: number }>()
+
+  // Optimized: use index-based arc state to avoid slice() allocations
+  const activeArcs = new Map<symbol, ArcState>()
+  // Optimized: reuse geoCircle generator per ripple
+  const activeRipples = new Map<symbol, RippleState>()
+
+  // Reusable GeoJSON object for arc rendering (avoids allocation per frame)
+  const reusableLineString: GeoJSON.LineString = {
+    type: 'LineString',
+    coordinates: [],
+  }
 
   // Computed radius based on container size
   const radius = computed(() => Math.min(config.value.width, config.value.height) / 2.2)
@@ -91,24 +118,19 @@ export function useD3Globe(
       .translate([config.value.width / 2, config.value.height / 2])
       .rotate(rotation.value)
 
-    // Update active arcs to follow globe rotation
+    // Update active arcs to follow globe rotation (using index, no slice)
     if (pathGenerator) {
-      activeArcs.forEach(({ element, points, progress }) => {
-        const pointIndex = Math.floor(progress * (points.length - 1))
-        const currentPoints = points.slice(0, pointIndex + 1)
-        if (currentPoints.length >= 2) {
-          const line: GeoJSON.LineString = {
-            type: 'LineString',
-            coordinates: currentPoints,
-          }
-          element.attr('d', pathGenerator!(line))
+      activeArcs.forEach(({ element, points, pointIndex }) => {
+        if (pointIndex >= 2) {
+          // Reuse LineString object, just update coordinates reference
+          reusableLineString.coordinates = points.slice(0, pointIndex)
+          element.attr('d', pathGenerator!(reusableLineString))
         }
       })
 
-      // Update active ripples to follow globe rotation
-      const circleGenerator = geoCircle()
-      activeRipples.forEach(({ element, center, currentRadius }) => {
-        circleGenerator.center(center).radius(currentRadius)
+      // Update active ripples to follow globe rotation (reusing circleGenerator)
+      activeRipples.forEach(({ element, circleGenerator, currentRadius }) => {
+        circleGenerator.radius(currentRadius)
         element.attr('d', pathGenerator!(circleGenerator()))
       })
     }
@@ -257,8 +279,14 @@ export function useD3Globe(
       .attr('stroke-linecap', 'round')
       .attr('opacity', 0.9)
 
-    // Store arc data for projection updates
-    const arcState = { timer: null as unknown as Timer, element: arcPath, points: arcPoints, progress: 0 }
+    // Store arc data for projection updates (using pointIndex instead of progress)
+    const arcState: ArcState = {
+      timer: null as unknown as Timer,
+      element: arcPath,
+      points: arcPoints,
+      pointIndex: 0,
+      numPoints,
+    }
 
     let startTime: number | null = null
 
@@ -269,19 +297,14 @@ export function useD3Globe(
       const rawProgress = Math.min((elapsed - startTime) / duration, 1)
       const easedProgress = easeCubicOut(rawProgress)
 
-      // Update stored progress for projection updates
-      arcState.progress = easedProgress
+      // Update stored pointIndex for projection updates (avoids slice in updateProjection)
+      const pointIndex = Math.floor(easedProgress * numPoints) + 1
+      arcState.pointIndex = pointIndex
 
-      // Use cached arc points based on eased progress
-      const pointIndex = Math.floor(easedProgress * numPoints)
-      const currentPoints = arcPoints.slice(0, pointIndex + 1)
-
-      if (currentPoints.length >= 2) {
-        const line: GeoJSON.LineString = {
-          type: 'LineString',
-          coordinates: currentPoints,
-        }
-        arcPath.attr('d', pathGenerator!(line))
+      if (pointIndex >= 2) {
+        // Reuse LineString, update coordinates by slicing only here during animation
+        reusableLineString.coordinates = arcPoints.slice(0, pointIndex)
+        arcPath.attr('d', pathGenerator!(reusableLineString))
       }
 
       if (rawProgress >= 1) {
@@ -314,6 +337,7 @@ export function useD3Globe(
     const maxRadius = rippleData.maxRadius ?? 5
     const duration = rippleData.duration ?? 1500
 
+    // Create and reuse circleGenerator for this ripple
     const circleGenerator = geoCircle().center(center)
 
     const ripplePath = svg.append('path')
@@ -324,8 +348,14 @@ export function useD3Globe(
       .attr('fill', rippleData.color ?? 'var(--chart-2)')
       .attr('fill-opacity', 0.15)
 
-    // Store ripple data for projection updates
-    const rippleState = { timer: null as unknown as Timer, element: ripplePath, center, currentRadius: 0 }
+    // Store ripple data for projection updates (include circleGenerator for reuse)
+    const rippleState: RippleState = {
+      timer: null as unknown as Timer,
+      element: ripplePath,
+      center,
+      currentRadius: 0,
+      circleGenerator,
+    }
 
     let startTime: number | null = null
 
@@ -403,6 +433,11 @@ export function useD3Globe(
     scale,
     radius,
     isAutoRotating,
+
+    // Getters for renderer integration
+    getRotation: () => rotation.value,
+    getScale: () => scale.value,
+    getRadius: () => radius.value,
 
     // Methods
     init,

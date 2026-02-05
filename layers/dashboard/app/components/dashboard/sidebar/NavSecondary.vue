@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import { Languages, Laptop, Moon, Sun } from 'lucide-vue-next'
-import { GitHubIcon } from 'vue3-simple-icons'
+import { Coffee, Languages, Laptop, Moon, Sun } from 'lucide-vue-next'
 import { useSidebar } from '@/components/ui/sidebar'
 
-const { github } = useAppConfig()
+const { coffee } = useAppConfig()
 const colorMode = useColorMode()
 const { setLocale, locales } = useI18n()
 const { state } = useSidebar()
-
-const { stats, status } = useGithubStats()
 </script>
 
 <template>
@@ -27,31 +24,20 @@ const { stats, status } = useGithubStats()
               <Tooltip :delay-duration="100">
                 <TooltipTrigger as-child>
                   <a
-                    :href="github"
+                    :href="coffee"
                     target="_blank"
-                    :title="$t('sidebar.github')"
+                    :title="$t('sidebar.coffee')"
                     class="
-                      flex h-8 items-center justify-center gap-1.5 rounded-md
-                      px-2
+                      flex h-8 items-center justify-center rounded-md px-2
                       hover:bg-sidebar-accent
                       hover:text-sidebar-accent-foreground
                     "
                   >
-                    <GitHubIcon class="size-4" />
-                    <template v-if="state !== 'collapsed'">
-                      <Skeleton v-if="status === 'pending'" class="h-4 w-8" />
-                      <span
-                        v-else class="
-                          text-xs text-muted-foreground tabular-nums
-                        "
-                      >
-                        {{ stats.stars }} {{ $t('sidebar.stars') }}
-                      </span>
-                    </template>
+                    <Coffee class="size-4" />
                   </a>
                 </TooltipTrigger>
                 <TooltipContent :side="state === 'collapsed' ? 'right' : 'top'">
-                  <p>{{ $t('sidebar.github') }}</p>
+                  <p>{{ $t('sidebar.coffee') }}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
