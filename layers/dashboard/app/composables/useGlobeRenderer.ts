@@ -1,12 +1,13 @@
 import type { GlobeConfig } from '#layers/dashboard/app/composables/useD3Globe'
-import type { VisiblePoint } from '#layers/dashboard/app/composables/useGlobeWorker'
 import type { GeoPermissibleObjects, GeoProjection } from 'd3-geo'
 import type { ComputedRef, Ref, ShallowRef } from 'vue'
 import type { GeoJSONData, LocationData } from '@/types'
+import { useColorMode } from '#imports'
 import { color as d3Color } from 'd3-color'
 import { geoGraticule, geoPath } from 'd3-geo'
 import { scaleSequentialSqrt } from 'd3-scale'
 import { interpolateYlOrRd } from 'd3-scale-chromatic'
+import { computed } from 'vue'
 
 export interface GlobeColors {
   globeFill: string
@@ -100,10 +101,7 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
   let lastCacheWidth = 0
   let lastCacheHeight = 0
 
-  // Worker results buffer
-  let visiblePoints: VisiblePoint[] = []
-
-  // Weight color scale for fallback rendering
+  // Weight color scale for heatmap rendering
   const weightColor = computed(() => {
     // Ensure domain is valid (avoid [0,0] which causes NaN)
     const domainMax = ctx.highest.value > 0 ? ctx.highest.value * 3 : 1
@@ -121,22 +119,22 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
       const countryCode = props?.ISO_A2 || props?.iso_a2 || ''
       const count = ctx.countryStats.value.get(countryCode) || 0
 
-      const ratio = count / max
-      const fill = count === 0
-        ? tiers.noData
-        : ratio <= 0.33
-          ? tiers.tier1
-          : ratio <= 0.66
-            ? tiers.tier2
-            : tiers.tier3
+      let fill = tiers.noData
+      if (count > 0) {
+        const ratio = count / max
+        if (ratio <= 0.33)
+          fill = tiers.tier1
+        else if (ratio <= 0.66)
+          fill = tiers.tier2
+        else
+          fill = tiers.tier3
+      }
 
       const group = groups.get(fill)
-      if (group) {
+      if (group)
         group.push(feature as GeoPermissibleObjects)
-      }
-      else {
+      else
         groups.set(fill, [feature as GeoPermissibleObjects])
-      }
     }
 
     return groups
@@ -165,7 +163,6 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
 
     // Invalidate caches on resize
     invalidatePathCache()
-    markDirty()
   }
 
   function invalidatePathCache() {
@@ -173,6 +170,7 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
     cachedGraticulePath = null
     cachedCountryPaths = null
     cachedCountryStrokePath = null
+    markDirty()
   }
 
   function shouldUpdateCache(): boolean {
@@ -187,15 +185,14 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
     const scaleChanged = Math.abs(scale - lastCacheScale) > 0.001
     const sizeChanged = w !== lastCacheWidth || h !== lastCacheHeight
 
-    if (rotationChanged || scaleChanged || sizeChanged) {
-      lastCacheRotation = [...rotation]
-      lastCacheScale = scale
-      lastCacheWidth = w
-      lastCacheHeight = h
-      return true
-    }
+    if (!rotationChanged && !scaleChanged && !sizeChanged)
+      return false
 
-    return false
+    lastCacheRotation = [...rotation]
+    lastCacheScale = scale
+    lastCacheWidth = w
+    lastCacheHeight = h
+    return true
   }
 
   function buildPathCache(projection: GeoProjection) {
@@ -236,11 +233,6 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
 
   function markDirty() {
     isDirty = true
-  }
-
-  function setVisiblePoints(points: VisiblePoint[]) {
-    visiblePoints = points
-    markDirty()
   }
 
   function render() {
@@ -302,29 +294,21 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
     }
 
     // Draw heatmap points
-    // If Worker has returned results, use optimized rendering
-    // Otherwise fallback to main thread rendering
-    if (visiblePoints.length > 0) {
-      renderHeatmapPointsOptimized(canvasCtx)
-    }
-    else if (ctx.locations.value.length > 0) {
-      // Fallback: render on main thread when Worker hasn't returned yet
-      renderHeatmapPointsFallback(canvasCtx, projection, w, h)
+    if (ctx.locations.value.length > 0) {
+      renderHeatmapPoints(canvasCtx, projection)
     }
 
     isDirty = false
   }
 
-  // Fallback rendering for when Worker hasn't returned results yet
-  function renderHeatmapPointsFallback(
+  function renderHeatmapPoints(
     canvasCtx: CanvasRenderingContext2D,
     projection: GeoProjection,
-    _w: number,
-    _h: number,
   ) {
+    const degToRad = Math.PI / 180
     const rotation = ctx.getRotation()
-    const centerLng = -rotation[0] * Math.PI / 180
-    const centerLat = -rotation[1] * Math.PI / 180
+    const centerLng = -rotation[0] * degToRad
+    const centerLat = -rotation[1] * degToRad
     const sinCenterLat = Math.sin(centerLat)
     const cosCenterLat = Math.cos(centerLat)
 
@@ -337,8 +321,8 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
         continue
 
       // Visibility check using dot product
-      const pointLat = loc.lat * Math.PI / 180
-      const pointLng = loc.lng * Math.PI / 180
+      const pointLat = loc.lat * degToRad
+      const pointLng = loc.lng * degToRad
       const dot = sinCenterLat * Math.sin(pointLat)
         + cosCenterLat * Math.cos(pointLat) * Math.cos(pointLng - centerLng)
 
@@ -371,34 +355,6 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
       canvasCtx.beginPath()
       canvasCtx.arc(x, y, radius * 0.6, 0, Math.PI * 2)
       canvasCtx.fillStyle = color
-      canvasCtx.fill()
-    }
-  }
-
-  function renderHeatmapPointsOptimized(canvasCtx: CanvasRenderingContext2D) {
-    for (const point of visiblePoints) {
-      const { x, y, radius, r, g, b } = point
-      const glowRadius = radius * 2
-
-      // Convert normalized RGB to CSS color string (pre-computed by Worker)
-      const colorStr = `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
-      const colorHalfAlpha = `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, 0.5)`
-
-      // Draw glow effect
-      const gradient = canvasCtx.createRadialGradient(x, y, 0, x, y, glowRadius)
-      gradient.addColorStop(0, colorStr)
-      gradient.addColorStop(0.5, colorHalfAlpha)
-      gradient.addColorStop(1, 'transparent')
-
-      canvasCtx.beginPath()
-      canvasCtx.arc(x, y, glowRadius, 0, Math.PI * 2)
-      canvasCtx.fillStyle = gradient
-      canvasCtx.fill()
-
-      // Draw solid center
-      canvasCtx.beginPath()
-      canvasCtx.arc(x, y, radius * 0.6, 0, Math.PI * 2)
-      canvasCtx.fillStyle = colorStr
       canvasCtx.fill()
     }
   }
@@ -438,7 +394,6 @@ export function useGlobeRenderer(ctx: GlobeRendererContext) {
     startRenderLoop,
     stopRenderLoop,
     markDirty,
-    setVisiblePoints,
     invalidatePathCache,
   }
 }

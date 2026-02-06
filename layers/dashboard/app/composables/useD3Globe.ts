@@ -39,7 +39,7 @@ export interface RippleData {
   color?: string
 }
 
-// Arc state with index-based rendering (no slice allocation)
+// Arc state with index-based rendering (reduced slice allocation)
 interface ArcState {
   timer: Timer
   element: any
@@ -68,10 +68,17 @@ export function useD3Globe(
   const inertia = computed(() => config.value.inertia ?? 0.9)
   const friction = computed(() => config.value.friction ?? 0.95)
 
+  const clampLatitude = (value: number) => Math.max(-90, Math.min(90, value))
+
   // Projection state
   const rotation = ref<[number, number]>(config.value.initialRotation ?? [0, -20])
   const scale = ref(1)
   const isAutoRotating = ref(true)
+  const isInertiaActive = ref(false)
+  const isInteracting = ref(false)
+
+  // Reactive animation counter (Map.size is not reactive)
+  const activeAnimationCount = ref(0)
 
   // Velocity for inertia
   let velocityX = 0
@@ -83,7 +90,7 @@ export function useD3Globe(
   let pathGenerator: GeoPath<any, GeoPermissibleObjects> | null = null
   let rotationTimer: Timer | null = null
 
-  // Optimized: use index-based arc state to avoid slice() allocations
+  // Optimized: use index-based arc state to reduce slice() allocations
   const activeArcs = new Map<symbol, ArcState>()
   // Optimized: reuse geoCircle generator per ripple
   const activeRipples = new Map<symbol, RippleState>()
@@ -108,7 +115,6 @@ export function useD3Globe(
     pathGenerator = geoPath(projection)
   }
 
-  // Update projection when config changes
   function updateProjection() {
     if (!projection)
       return
@@ -118,22 +124,30 @@ export function useD3Globe(
       .translate([config.value.width / 2, config.value.height / 2])
       .rotate(rotation.value)
 
-    // Update active arcs to follow globe rotation (using index, no slice)
-    if (pathGenerator) {
-      activeArcs.forEach(({ element, points, pointIndex }) => {
-        if (pointIndex >= 2) {
-          // Reuse LineString object, just update coordinates reference
-          reusableLineString.coordinates = points.slice(0, pointIndex)
-          element.attr('d', pathGenerator!(reusableLineString))
-        }
-      })
+    if (!pathGenerator)
+      return
 
-      // Update active ripples to follow globe rotation (reusing circleGenerator)
-      activeRipples.forEach(({ element, circleGenerator, currentRadius }) => {
-        circleGenerator.radius(currentRadius)
-        element.attr('d', pathGenerator!(circleGenerator()))
-      })
-    }
+    const currentPathGenerator = pathGenerator
+
+    // Update active arcs to follow globe rotation (using index; slice only for drawing)
+    activeArcs.forEach(({ element, points, pointIndex }) => {
+      if (pointIndex >= 2) {
+        // Reuse LineString object, just update coordinates reference
+        reusableLineString.coordinates = points.slice(0, pointIndex)
+        element.attr('d', currentPathGenerator(reusableLineString))
+      }
+    })
+
+    // Update active ripples to follow globe rotation (reusing circleGenerator)
+    activeRipples.forEach(({ element, circleGenerator, currentRadius }) => {
+      circleGenerator.radius(currentRadius)
+      element.attr('d', currentPathGenerator(circleGenerator()))
+    })
+  }
+
+  function setRotation(lambda: number, phi: number) {
+    rotation.value = [lambda, clampLatitude(phi)]
+    updateProjection()
   }
 
   // Setup drag behavior with inertia
@@ -143,6 +157,7 @@ export function useD3Globe(
 
     const dragBehavior = drag<SVGSVGElement, unknown>()
       .on('start', () => {
+        isInteracting.value = true
         stopAutoRotate()
         stopInertia()
         velocityX = 0
@@ -159,15 +174,15 @@ export function useD3Globe(
         velocityX = event.dx * k * inertia.value
         velocityY = -event.dy * k * inertia.value
 
-        rotation.value = [
+        setRotation(
           lambda + event.dx * k,
-          Math.max(-90, Math.min(90, phi - event.dy * k)),
-        ]
-        updateProjection()
+          phi - event.dy * k,
+        )
       })
       .on('end', () => {
         // Start inertia animation
         startInertia()
+        isInteracting.value = false
       })
 
     select(svgRef.value).call(dragBehavior as any)
@@ -178,6 +193,7 @@ export function useD3Globe(
     if (inertiaTimer)
       inertiaTimer.stop()
 
+    isInertiaActive.value = true
     inertiaTimer = timer(() => {
       // Apply friction
       velocityX *= friction.value
@@ -190,15 +206,15 @@ export function useD3Globe(
       }
 
       const [lambda, phi] = rotation.value
-      rotation.value = [
+      setRotation(
         lambda + velocityX,
-        Math.max(-90, Math.min(90, phi + velocityY)),
-      ]
-      updateProjection()
+        phi + velocityY,
+      )
     })
   }
 
   function stopInertia() {
+    isInertiaActive.value = false
     if (inertiaTimer) {
       inertiaTimer.stop()
       inertiaTimer = null
@@ -212,9 +228,17 @@ export function useD3Globe(
 
     const zoomBehavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([minScale.value, maxScale.value])
+      .on('start', () => {
+        isInteracting.value = true
+        stopAutoRotate()
+        stopInertia()
+      })
       .on('zoom', (event) => {
         scale.value = event.transform.k
         updateProjection()
+      })
+      .on('end', () => {
+        isInteracting.value = false
       })
 
     select(svgRef.value)
@@ -222,19 +246,27 @@ export function useD3Globe(
       .call(zoomBehavior.transform as any, zoomIdentity)
   }
 
-  // Auto rotation
+  // Auto rotation (stops after one full revolution)
   function startAutoRotate() {
     if (rotationTimer)
       rotationTimer.stop()
     isAutoRotating.value = true
+
+    let totalRotation = 0
+    const fullRevolution = 360
 
     rotationTimer = timer(() => {
       if (!isAutoRotating.value)
         return
 
       const [lambda, phi] = rotation.value
-      rotation.value = [lambda - autoRotateSpeed.value, phi]
-      updateProjection()
+      setRotation(lambda - autoRotateSpeed.value, phi)
+      totalRotation += autoRotateSpeed.value
+
+      // Stop after one full revolution
+      if (totalRotation >= fullRevolution) {
+        stopAutoRotate()
+      }
     })
   }
 
@@ -297,7 +329,7 @@ export function useD3Globe(
       const rawProgress = Math.min((elapsed - startTime) / duration, 1)
       const easedProgress = easeCubicOut(rawProgress)
 
-      // Update stored pointIndex for projection updates (avoids slice in updateProjection)
+      // Update stored pointIndex for projection updates (reduces slice work)
       const pointIndex = Math.floor(easedProgress * numPoints) + 1
       arcState.pointIndex = pointIndex
 
@@ -315,6 +347,7 @@ export function useD3Globe(
           .on('end', () => {
             arcPath.remove()
             activeArcs.delete(id)
+            activeAnimationCount.value--
           })
 
         arcTimer.stop()
@@ -323,6 +356,7 @@ export function useD3Globe(
 
     arcState.timer = arcTimer
     activeArcs.set(id, arcState)
+    activeAnimationCount.value++
     return id
   }
 
@@ -385,11 +419,13 @@ export function useD3Globe(
         ripplePath.remove()
         rippleTimer.stop()
         activeRipples.delete(id)
+        activeAnimationCount.value--
       }
     })
 
     rippleState.timer = rippleTimer
     activeRipples.set(id, rippleState)
+    activeAnimationCount.value++
     return id
   }
 
@@ -418,6 +454,7 @@ export function useD3Globe(
     activeRipples.forEach(ripple => ripple.timer.stop())
     activeArcs.clear()
     activeRipples.clear()
+    activeAnimationCount.value = 0
   }
 
   // Initialize
@@ -427,12 +464,18 @@ export function useD3Globe(
     setupZoom()
   }
 
+  // Check if there are active animations (using reactive counter)
+  const hasActiveAnimations = computed(() => activeAnimationCount.value > 0)
+
   return {
     // State
     rotation,
     scale,
     radius,
     isAutoRotating,
+    isInertiaActive,
+    isInteracting,
+    hasActiveAnimations,
 
     // Getters for renderer integration
     getRotation: () => rotation.value,

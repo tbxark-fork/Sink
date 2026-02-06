@@ -1,38 +1,18 @@
 <script setup lang="ts">
 import { useDebounceFn, useElementSize } from '@vueuse/core'
-import {
-  createGlobeConfig,
-  useGlobeData,
-  useTrafficEvent,
-} from './useGlobeData'
-import { useGlobeColors, useGlobeRenderer } from './useGlobeRenderer'
 
-// Traffic event bus (auto-imported from app/composables)
 const trafficEventBus = useTrafficEventBus()
 
-// Refs
 const containerRef = useTemplateRef('containerRef')
 const canvasRef = useTemplateRef('canvasRef')
 const svgRef = useTemplateRef('svgRef')
-
 const { width, height } = useElementSize(containerRef)
 
-// Data layer
 const globeData = useGlobeData()
-
-// Config
 const globeConfig = createGlobeConfig(width, height, globeData.currentLocation)
-
-// D3 Globe (projection, interactions, animations)
 const globe = useD3Globe(svgRef, globeConfig)
-
-// Colors
 const { arcColor, colors, countryColorTiers } = useGlobeColors()
 
-// Worker for heavy computations
-const globeWorker = useGlobeWorker()
-
-// Renderer
 const renderer = useGlobeRenderer({
   canvasRef,
   config: globeConfig,
@@ -47,74 +27,60 @@ const renderer = useGlobeRenderer({
   updateProjection: globe.updateProjection,
   getRotation: globe.getRotation,
   getScale: globe.getScale,
-  getRadius: () => globe.radius.value,
+  getRadius: globe.getRadius,
 })
 
-// Traffic events
 const trafficEvent = useTrafficEvent({
   colos: globeData.colos,
   arcColor,
   globe,
 })
 
-// Send data to worker for computation
-function updateWorkerData() {
-  if (globeData.locations.value.length === 0) {
-    // Clear visible points when data is empty
-    renderer.setVisiblePoints([])
-    return
-  }
+// Smart render loop: only continuous render when animating
+const needsContinuousRender = computed(() =>
+  globe.isAutoRotating.value
+  || globe.isInertiaActive.value
+  || globe.isInteracting.value
+  || globe.hasActiveAnimations.value,
+)
 
-  globeWorker.computeAsync({
-    locations: globeData.locations.value,
-    width: globeConfig.value.width,
-    height: globeConfig.value.height,
-    scale: globe.scale.value,
-    rotation: globe.rotation.value,
-    radius: globe.radius.value,
-    highest: globeData.highest.value,
-  })
+watch(needsContinuousRender, (needsLoop) => {
+  if (needsLoop) {
+    renderer.startRenderLoop()
+  }
+  else {
+    renderer.stopRenderLoop()
+    renderer.renderOnce()
+  }
+})
+
+function renderOnceIfIdle() {
+  if (!needsContinuousRender.value)
+    renderer.renderOnce()
 }
 
-// Watch for worker results and update renderer
-watch(globeWorker.currentBuffer, (points) => {
-  renderer.setVisiblePoints(points)
-})
-
-// Watch for data changes to trigger worker computation
-watch([
-  globeData.locations,
-  globeData.highest,
-], updateWorkerData)
-
-// Watch for rotation/scale changes to update worker (throttled via worker busy state)
-watch([globe.rotation, globe.scale], updateWorkerData)
-
-// Watch for data/color changes to invalidate country path cache
-watch([globeData.countryStats, countryColorTiers, colors], () => {
+function invalidatePathCacheAndRender() {
   renderer.invalidatePathCache()
-})
+  renderOnceIfIdle()
+}
 
-// Resize handling
-const debouncedResize = useDebounceFn(() => {
+function markDirtyAndRender() {
+  renderer.markDirty()
+  renderOnceIfIdle()
+}
+
+watch([globeData.countryStats, countryColorTiers, colors], invalidatePathCacheAndRender)
+watch(globeData.countries, invalidatePathCacheAndRender)
+watch(globeData.locations, markDirtyAndRender)
+
+const handleResize = useDebounceFn(() => {
   renderer.updateCanvasSize()
   globe.updateProjection()
-  updateWorkerData()
 }, 100)
+watch([width, height], handleResize)
 
-watch([width, height], debouncedResize)
-
-function stopRotation() {
-  globe.stopAutoRotate()
-}
-
-// Lifecycle
 onMounted(async () => {
-  // Initialize worker
-  globeWorker.init()
-
   await globeData.init()
-
   globe.init()
   renderer.updateCanvasSize()
 
@@ -123,18 +89,13 @@ onMounted(async () => {
     globe.setPointOfView(latitude, longitude)
   }
 
-  // Initial worker computation
-  updateWorkerData()
-
   renderer.startRenderLoop()
   globe.startAutoRotate()
-
   trafficEventBus.on(trafficEvent.handleTrafficEvent)
 })
 
 onBeforeUnmount(() => {
   renderer.stopRenderLoop()
-  globeWorker.destroy()
   trafficEventBus.off(trafficEvent.handleTrafficEvent)
   globe.destroy()
   trafficEvent.cleanup()
@@ -146,8 +107,8 @@ onBeforeUnmount(() => {
     ref="containerRef"
     class="relative h-full w-full"
     :style="{ '--globe-glow-color': arcColor }"
-    @mousedown="stopRotation"
-    @touchstart="stopRotation"
+    @mousedown="globe.stopAutoRotate"
+    @touchstart="globe.stopAutoRotate"
   >
     <canvas ref="canvasRef" class="absolute inset-0" />
     <svg ref="svgRef" class="pointer-events-auto absolute inset-0" :width="width" :height="height || width" />
