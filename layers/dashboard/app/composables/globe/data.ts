@@ -3,7 +3,7 @@ import type { AreaData, ColoData, CurrentLocation, GeoJSONData, LocationData } f
 import { watchDeep } from '@vueuse/core'
 import { computed, ref, shallowRef } from 'vue'
 import { useAPI } from '@/utils/api'
-import { useDashboardRealtimeStore } from './realtime'
+import { useDashboardRealtimeStore } from '../realtime'
 
 interface RawLocationData {
   latitude: number

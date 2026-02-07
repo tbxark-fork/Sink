@@ -1,29 +1,8 @@
+import type { CountryColorTiers, GlobeColors, HeatmapColorTiers } from './types'
 import { useColorMode } from '#imports'
 import { computed } from 'vue'
 
-export interface GlobeColors {
-  globeFill: string
-  globeStroke: string
-  graticuleFill: string
-  graticuleStroke: string
-  countryStroke: string
-}
-
-export interface CountryColorTiers {
-  noData: string
-  noDataStroke: string
-  tier1: string
-  tier2: string
-  tier3: string
-}
-
-export interface HeatmapColorTiers {
-  tier1: string
-  tier2: string
-  tier3: string
-  tier4: string
-  tier5: string
-}
+export type { CountryColorTiers, GlobeColors, HeatmapColorTiers }
 
 export function useGlobeColors() {
   const colorMode = useColorMode()
@@ -35,15 +14,10 @@ export function useGlobeColors() {
 
   const colors = computed<GlobeColors>(() => ({
     globeFill: isDark.value ? 'oklch(0.3 0.005 286)' : 'oklch(0.95 0.002 286)',
-    globeStroke: isDark.value ? 'oklch(0.4 0.01 286 / 25%)' : 'oklch(0.75 0.006 286 / 20%)',
-    graticuleFill: 'none',
-    graticuleStroke: isDark.value ? 'oklch(0.35 0.01 286 / 30%)' : 'oklch(0.75 0.006 286 / 30%)',
-    countryStroke: isDark.value ? 'oklch(0.5 0.005 286 / 30%)' : 'oklch(0.8 0.004 286 / 20%)',
   }))
 
   const countryColorTiers = computed<CountryColorTiers>(() => ({
     noData: isDark.value ? 'oklch(0.4 0.005 286)' : 'oklch(0.88 0.003 286)',
-    noDataStroke: isDark.value ? 'oklch(0.5 0.005 286)' : 'oklch(0.82 0.003 286)',
     tier1: isDark.value ? 'oklch(0.723 0.219 149.579 / 35%)' : 'oklch(0.723 0.219 149.579 / 40%)',
     tier2: isDark.value ? 'oklch(0.723 0.219 149.579 / 55%)' : 'oklch(0.723 0.219 149.579 / 60%)',
     tier3: isDark.value ? 'oklch(0.723 0.219 149.579 / 75%)' : 'oklch(0.723 0.219 149.579 / 80%)',

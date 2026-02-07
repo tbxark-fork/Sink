@@ -1,3 +1,10 @@
+defineRouteMeta({
+  openAPI: {
+    description: 'Search all links (returns slug, url, comment for each link)',
+    security: [{ bearerAuth: [] }],
+  },
+})
+
 interface Link {
   slug: string
   url: string

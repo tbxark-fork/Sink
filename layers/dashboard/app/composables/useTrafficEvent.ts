@@ -1,4 +1,5 @@
 import type { ComputedRef, ShallowRef } from 'vue'
+import type { ArcData, RippleData } from './globe/types'
 import type { ColoData, TrafficEventParams } from '@/types'
 
 export interface TrafficEventContext {
@@ -6,15 +7,15 @@ export interface TrafficEventContext {
   arcColor: ComputedRef<string>
   globe: {
     isReady: () => boolean
-    drawArc: (arcData: any, duration?: number) => symbol
-    drawRipple: (rippleData: any) => symbol
+    drawArc: (arcData: ArcData, duration?: number) => void
+    drawRipple: (rippleData: RippleData) => void
   }
 }
 
 export function useTrafficEvent(ctx: TrafficEventContext) {
   const pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
 
-  function handleTrafficEvent({ props }: TrafficEventParams, { delay = 2000 }: { delay?: number } = {}) {
+  function handleTrafficEvent({ props }: TrafficEventParams, { delay = 1200 }: { delay?: number } = {}) {
     if (!ctx.globe.isReady())
       return
 
@@ -34,15 +35,25 @@ export function useTrafficEvent(ctx: TrafficEventContext) {
       return
     }
 
-    // Skip if too close
+    // Near trajectories: show only destination ripple, skip arc
     const isNear = Math.abs(endLat - latitude) < 5 && Math.abs(endLng - longitude) < 5
+    const color = ctx.arcColor.value
+
     if (isNear) {
-      console.info(`from ${city} to ${COLO} is near, skip`)
+      if (import.meta.dev)
+        console.info(`from ${city} to ${COLO} is near, ripple only`)
+      ctx.globe.drawRipple({
+        lat: endLat,
+        lng: endLng,
+        maxRadius: 6,
+        duration: delay * 1.2,
+        color,
+      })
       return
     }
 
-    console.info(`from ${city}(${latitude}, ${longitude}) to ${COLO}(${endLat}, ${endLng})`)
-    const color = ctx.arcColor.value
+    if (import.meta.dev)
+      console.info(`from ${city}(${latitude}, ${longitude}) to ${COLO}(${endLat}, ${endLng})`)
 
     // Draw arc
     ctx.globe.drawArc({

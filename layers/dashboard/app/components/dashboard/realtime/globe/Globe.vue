@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { useGlobeColors } from '#layers/dashboard/app/composables/useGlobeColors'
-import { useWebGLGlobe } from '#layers/dashboard/app/composables/useWebGLGlobe'
+import { useGlobeColors, useGlobeData, useWebGLGlobe } from '#layers/dashboard/app/composables/globe'
 import { useDebounceFn, useElementSize } from '@vueuse/core'
 
 const trafficEventBus = useTrafficEventBus()
@@ -59,12 +58,11 @@ onMounted(async () => {
   await globe.updateCountryTexture()
 
   const { latitude, longitude } = globeData.currentLocation.value
-  if (latitude != null && longitude != null) {
-    globe.setPointOfView(latitude, longitude, true)
-  }
-  else {
-    globe.startAutoRotate()
-  }
+  const parsedLat = Number(latitude)
+  const parsedLng = Number(longitude)
+  const targetLat = Number.isFinite(parsedLat) ? parsedLat : 0
+  const targetLng = Number.isFinite(parsedLng) ? parsedLng : 0
+  globe.setPointOfView(targetLat, targetLng, true)
 
   globe.startRenderLoop()
   trafficEventBus.on(trafficEvent.handleTrafficEvent)

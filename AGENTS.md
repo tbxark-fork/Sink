@@ -11,21 +11,22 @@ Sink is a link shortener with analytics, running 100% on Cloudflare. Uses Nuxt 4
 ## Project Structure
 
 ```
-app/                    # Nuxt 4 application
+app/                    # Nuxt 4 application (main app layer)
   ├── components/       # Vue components (PascalCase)
-  │   ├── ui/           # shadcn-vue components (DO NOT EDIT - auto-generated)
-  │   ├── dashboard/    # Dashboard components
-  │   └── home/         # Landing page components
-  ├── composables/      # Vue composables (camelCase)
+  │   └── ui/           # shadcn-vue components (DO NOT EDIT - auto-generated)
+  ├── composables/      # Vue composables (camelCase, use* prefix)
   ├── pages/            # File-based routing
-  ├── types/            # TypeScript types
+  ├── types/            # TypeScript types (re-exports from shared/)
   ├── utils/            # Utility functions
   └── lib/              # Shared helpers
 layers/dashboard/       # Dashboard layer (extends app/)
+  └── app/components/dashboard/  # Dashboard-specific components
+shared/                 # Shared code (client + server)
+  ├── schemas/          # Zod validation schemas
+  └── types/            # Shared TypeScript types
 server/                 # Nitro server (Cloudflare Workers)
   ├── api/              # API endpoints (method suffix: create.post.ts)
-  └── utils/            # Server utilities
-schemas/                # Zod validation schemas (shared client/server)
+  └── utils/            # Server utilities (auto-imported)
 tests/                  # Vitest tests (Cloudflare Workers pool)
 ```
 
@@ -38,7 +39,7 @@ Use **pnpm** (v10+) with **Node.js 22+**.
 pnpm dev                  # Start dev server (port 7465)
 pnpm build                # Production build
 pnpm preview              # Worker preview via wrangler
-pnpm lint:fix             # ESLint with auto-fix
+pnpm lint:fix             # ESLint with auto-fix (ALWAYS run before commit)
 pnpm types:check          # TypeScript type check
 
 # Testing (Vitest + @cloudflare/vitest-pool-workers)
@@ -54,18 +55,19 @@ pnpm deploy:worker        # Deploy to Cloudflare Workers
 
 ## Code Style
 
-Uses `@antfu/eslint-config`. Run `pnpm lint:fix` before committing.
+Uses `@antfu/eslint-config` with `eslint-plugin-better-tailwindcss`. Run `pnpm lint:fix` before committing.
 
 **Formatting**: 2-space indent | Single quotes | No semicolons | Trailing commas
 
 ### TypeScript
 
-- Use TypeScript everywhere; prefer `interface` for objects, `type` for unions
+- Use TypeScript everywhere; prefer `interface` for objects, `type` for unions/aliases
 - Avoid `any`; use proper types or `unknown`
-- Use Zod for runtime validation in `schemas/`
+- Use Zod for runtime validation in `shared/schemas/`
+- Export types with `export type` for type-only exports
 
 ```typescript
-// schemas/link.ts - shared validation
+// shared/schemas/link.ts - shared validation
 export const LinkSchema = z.object({
   id: z.string().trim().max(26),
   url: z.string().trim().url().max(2048),
@@ -81,6 +83,7 @@ Use `<script setup lang="ts">` always. Files: PascalCase (`LinkEditor.vue`).
 ```vue
 <script setup lang="ts">
 import type { Link } from '@/types'
+import { Copy } from 'lucide-vue-next'
 
 const props = defineProps<{ link: Link }>()
 const emit = defineEmits<{ update: [link: Link] }>()
@@ -93,19 +96,20 @@ const emit = defineEmits<{ update: [link: Link] }>()
 
 ### Imports
 
-- **Prefer Nuxt auto-imports**: `ref`, `computed`, `useFetch`, `useState`, etc.
+- **Prefer Nuxt auto-imports**: `ref`, `computed`, `useFetch`, `useState`, `useRuntimeConfig`, etc.
 - **Explicit imports for**: external libs, types (`import type { Link } from '@/types'`), icons (`import { Copy } from 'lucide-vue-next'`)
+- **Server utils are auto-imported**: Functions in `server/utils/` are available globally in server code
 
 ### Naming Conventions
 
-| Item           | Convention       | Example               |
-| -------------- | ---------------- | --------------------- |
-| Components     | PascalCase       | `LinkEditor.vue`      |
-| Composables    | `use` prefix     | `useDashboardRoute()` |
-| API routes     | method suffix    | `create.post.ts`      |
-| Directories    | kebab-case       | `dashboard/links/`    |
-| Functions/vars | camelCase        | `getLink`             |
-| Constants      | UPPER_SNAKE_CASE | `DASHBOARD_ROUTES`    |
+| Item           | Convention       | Example            |
+| -------------- | ---------------- | ------------------ |
+| Components     | PascalCase       | `LinkEditor.vue`   |
+| Composables    | `use` prefix     | `useAuthToken()`   |
+| API routes     | method suffix    | `create.post.ts`   |
+| Directories    | kebab-case       | `dashboard/links/` |
+| Functions/vars | camelCase        | `getLink`          |
+| Constants      | UPPER_SNAKE_CASE | `TOKEN_KEY`        |
 
 ### Error Handling
 
@@ -128,18 +132,19 @@ const { cloudflare } = event.context
 const { KV, ANALYTICS, AI, R2 } = cloudflare.env
 ```
 
-| Binding     | Type             | Purpose                    |
-| ----------- | ---------------- | -------------------------- |
-| `KV`        | Workers KV       | Link storage               |
-| `ANALYTICS` | Analytics Engine | Click tracking & analytics |
-| `AI`        | Workers AI       | AI-powered slug generation |
-| `R2`        | R2 Bucket        | Data backup & file storage |
+| Binding     | Type             | Purpose                      |
+| ----------- | ---------------- | ---------------------------- |
+| `KV`        | Workers KV       | Link storage (`link:{slug}`) |
+| `ANALYTICS` | Analytics Engine | Click tracking & analytics   |
+| `AI`        | Workers AI       | AI-powered slug generation   |
+| `R2`        | R2 Bucket        | Image uploads & backup       |
 
 ## Testing Patterns
 
 Tests use `@cloudflare/vitest-pool-workers` with real Cloudflare bindings (single worker, shared storage).
 
 ```typescript
+import { generateMock } from '@anatine/zod-mock'
 import { describe, expect, it } from 'vitest'
 import { fetchWithAuth, postJson } from '../utils'
 
@@ -151,9 +156,14 @@ describe.sequential('/api/link/create', () => {
 })
 ```
 
-**Test utilities** (`tests/utils.ts`): `fetchWithAuth`, `postJson`, `putJson`, `fetch`
+**Test utilities** (`tests/utils.ts`):
 
-Use `describe.sequential` for tests that share state.
+- `fetchWithAuth(path, options)` - GET with auth header
+- `postJson(path, body, withAuth?)` - POST JSON with optional auth
+- `putJson(path, body, withAuth?)` - PUT JSON with optional auth
+- `fetch(path, options)` - Raw fetch without auth
+
+Use `describe.sequential` for tests that share state (most API tests).
 
 ## UI Components
 
@@ -161,6 +171,7 @@ Use `describe.sequential` for tests that share state.
 - Use `ResponsiveModal` for mobile-optimized dialogs
 - Use Tailwind CSS v4 for styling
 - Use static English for `aria-label` (no `$t()` translations)
+- Icons from `lucide-vue-next`
 
 ## Commits
 
@@ -169,3 +180,19 @@ Follow Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`
 ## Pre-commit
 
 `simple-git-hooks` runs `lint-staged` on commit, auto-runs `eslint --fix` on staged files.
+
+## API Route Patterns
+
+API routes use method suffix convention:
+
+- `create.post.ts` → `POST /api/link/create`
+- `query.get.ts` → `GET /api/link/query`
+- `edit.put.ts` → `PUT /api/link/edit`
+
+Server utils in `server/utils/` are auto-imported:
+
+- `getLink(event, slug)` - Fetch link from KV
+- `putLink(event, link)` - Store link in KV
+- `deleteLink(event, slug)` - Remove link from KV
+- `normalizeSlug(event, slug)` - Case normalization
+- `buildShortLink(event, slug)` - Construct full URL
