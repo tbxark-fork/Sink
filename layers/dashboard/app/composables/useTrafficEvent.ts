@@ -5,7 +5,7 @@ export interface TrafficEventContext {
   colos: ShallowRef<Record<string, ColoData>>
   arcColor: ComputedRef<string>
   globe: {
-    getProjection: () => any
+    isReady: () => boolean
     drawArc: (arcData: any, duration?: number) => symbol
     drawRipple: (rippleData: any) => symbol
   }
@@ -15,8 +15,7 @@ export function useTrafficEvent(ctx: TrafficEventContext) {
   const pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
 
   function handleTrafficEvent({ props }: TrafficEventParams, { delay = 2000 }: { delay?: number } = {}) {
-    const projection = ctx.globe.getProjection()
-    if (!projection)
+    if (!ctx.globe.isReady())
       return
 
     const { item } = props
@@ -54,23 +53,23 @@ export function useTrafficEvent(ctx: TrafficEventContext) {
       color,
     }, delay)
 
-    // Draw start ripple (small)
+    // Draw start ripple
     ctx.globe.drawRipple({
       lat: latitude,
       lng: longitude,
-      maxRadius: 0.75,
-      duration: delay * 0.6,
+      maxRadius: 3,
+      duration: delay * 0.8,
       color,
     })
 
-    // Draw end ripple after delay (larger)
+    // Draw end ripple after delay
     const timeoutId = setTimeout(() => {
       pendingTimeouts.delete(timeoutId)
       ctx.globe.drawRipple({
         lat: endLat,
         lng: endLng,
-        maxRadius: 3,
-        duration: delay,
+        maxRadius: 6,
+        duration: delay * 1.2,
         color,
       })
     }, delay)
