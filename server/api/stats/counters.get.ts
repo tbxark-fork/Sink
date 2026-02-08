@@ -8,11 +8,7 @@ function query2sql(query: Query, event: H3Event): string {
   const { dataset } = useRuntimeConfig(event)
   // Use weighted distinct count to account for sampling
   // Formula: COUNT(DISTINCT col) * SUM(_sample_interval) / COUNT() ≈ actual distinct count
-  const sql = select(`
-    SUM(_sample_interval) as visits,
-    ROUND(COUNT(DISTINCT ${logsMap.ip}) * SUM(_sample_interval) / COUNT()) as visitors,
-    ROUND(COUNT(DISTINCT ${logsMap.referer}) * SUM(_sample_interval) / COUNT()) as referers
-  `.trim().replace(/\s+/g, ' ')).from(dataset).where(filter)
+  const sql = select(`index1 as id, SUM(_sample_interval) as visits, ROUND(COUNT(DISTINCT ${logsMap.ip}) * SUM(_sample_interval) / COUNT()) as visitors, ROUND(COUNT(DISTINCT ${logsMap.referer}) * SUM(_sample_interval) / COUNT()) as referers`).from(dataset).where(filter).groupBy('index1')
   appendTimeFilter(sql, query)
   return sql.toString()
 }

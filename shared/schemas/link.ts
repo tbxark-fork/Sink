@@ -25,6 +25,7 @@ export const LinkSchema = z.object({
   google: z.string().trim().url().max(2048).optional(),
   cloaking: z.boolean().optional(),
   redirectWithQuery: z.boolean().optional(),
+  password: z.string().trim().min(1).max(128).optional(),
 })
 
 export type Link = z.infer<typeof LinkSchema>

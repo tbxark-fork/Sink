@@ -66,6 +66,32 @@ export default eventHandler(async (event) => {
     }
 
     if (link) {
+      // Password protection check
+      if (link.password) {
+        const headerPassword = getHeader(event, 'x-link-password')
+
+        if (event.method === 'POST') {
+          const body = await readBody(event)
+          const submittedPassword = body?.password
+
+          if (submittedPassword !== link.password) {
+            setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
+            setHeader(event, 'Cache-Control', 'no-store')
+            return generatePasswordHtml(slug, true)
+          }
+        }
+        else if (headerPassword) {
+          if (headerPassword !== link.password) {
+            throw createError({ status: 403, statusText: 'Incorrect password' })
+          }
+        }
+        else {
+          setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
+          setHeader(event, 'Cache-Control', 'no-store')
+          return generatePasswordHtml(slug)
+        }
+      }
+
       event.context.link = link
       try {
         await useAccessLog(event)
