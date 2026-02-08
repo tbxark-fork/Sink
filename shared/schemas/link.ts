@@ -23,6 +23,8 @@ export const LinkSchema = z.object({
   image: z.string().trim().max(128).optional(),
   apple: z.string().trim().url().max(2048).optional(),
   google: z.string().trim().url().max(2048).optional(),
+  cloaking: z.boolean().optional(),
+  redirectWithQuery: z.boolean().optional(),
 })
 
 export type Link = z.infer<typeof LinkSchema>

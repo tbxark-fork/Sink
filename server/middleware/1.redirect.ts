@@ -76,7 +76,8 @@ export default eventHandler(async (event) => {
 
       const userAgent = getHeader(event, 'user-agent') || ''
       const query = getQuery(event)
-      const buildTarget = (url: string) => redirectWithQuery ? withQuery(url, query) : url
+      const shouldRedirectWithQuery = link.redirectWithQuery ?? redirectWithQuery
+      const buildTarget = (url: string) => shouldRedirectWithQuery ? withQuery(url, query) : url
 
       const deviceRedirectUrl = getDeviceRedirectUrl(userAgent, link)
       if (deviceRedirectUrl) {
@@ -87,6 +88,14 @@ export default eventHandler(async (event) => {
         const baseUrl = `${getRequestProtocol(event)}://${getRequestHost(event)}`
         const html = generateOgHtml(link, buildTarget(link.url), baseUrl)
         setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
+        return html
+      }
+
+      if (link.cloaking) {
+        const baseUrl = `${getRequestProtocol(event)}://${getRequestHost(event)}`
+        const html = generateCloakingHtml(link, buildTarget(link.url), baseUrl)
+        setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
+        setHeader(event, 'Cache-Control', 'no-cache')
         return html
       }
 
