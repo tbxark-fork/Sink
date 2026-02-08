@@ -92,5 +92,8 @@ export default eventHandler(async (event) => {
 
       return sendRedirect(event, buildTarget(link.url), +redirectStatusCode)
     }
+    else {
+      throw createError({ status: 404, statusText: 'Link not found' })
+    }
   }
 })
