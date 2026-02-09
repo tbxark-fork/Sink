@@ -13,6 +13,7 @@
     "test": "vitest",
     "build": "NODE_OPTIONS=--max-old-space-size=8192 nuxt build",
     "build:map": "node scripts/build-map.js",
+    "build:sphere": "node scripts/build-sphere.js",
     "build:colo": "node scripts/build-colo.js",
     "build:testimonials": "node scripts/build-testimonials.js",
     "lint": "eslint .",

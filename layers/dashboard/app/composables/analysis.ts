@@ -55,15 +55,17 @@ export const useDashboardAnalysisStore = defineStore('dashboard-analysis', () =>
       return
 
     // Restore from URL
-    if (searchParams.preset) {
-      datePreset.value = searchParams.preset as string
-    }
+    // Custom time range takes priority over preset
     if (searchParams.time) {
       const time = safeDestr<{ startAt: number, endAt: number }>(searchParams.time)
       if (Number.isFinite(time?.startAt) && Number.isFinite(time?.endAt)) {
         dateRange.value.startAt = time.startAt
         dateRange.value.endAt = time.endAt
+        datePreset.value = null
       }
+    }
+    else if (searchParams.preset) {
+      datePreset.value = searchParams.preset as string
     }
     if (searchParams.filters) {
       const restored = safeDestr<Record<string, string>>(searchParams.filters)

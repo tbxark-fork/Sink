@@ -22,7 +22,7 @@ function handleFilterChange(type: string, value: string) {
         "
       />
       <DashboardDatePicker />
-      <DashboardFilters @change="handleFilterChange" />
+      <DashboardFilters :filters="analysisStore.filters" @change="handleFilterChange" />
     </Teleport>
 
     <DashboardAnalysis />

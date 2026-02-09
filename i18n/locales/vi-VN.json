@@ -64,7 +64,8 @@
     "export": "Xuất",
     "coffee": "Mua cho tôi một ly cà phê",
     "github": "GitHub",
-    "stars": "Stars"
+    "stars": "Stars",
+    "update": "Phiên bản mới {version} có sẵn (hiện tại: {current})"
   },
   "home": {
     "hero": {

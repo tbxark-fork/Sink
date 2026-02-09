@@ -64,7 +64,8 @@
     "export": "Exportieren",
     "coffee": "Kauf mir einen Kaffee",
     "github": "GitHub",
-    "stars": "Stars"
+    "stars": "Stars",
+    "update": "Neue Version {version} verfügbar (aktuell: {current})"
   },
   "home": {
     "hero": {

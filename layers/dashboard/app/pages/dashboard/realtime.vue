@@ -25,7 +25,7 @@ function handleFilterChange(type: string, value: string) {
         "
       />
       <DashboardTimePicker />
-      <DashboardFilters @change="handleFilterChange" />
+      <DashboardFilters :filters="realtimeStore.filters" @change="handleFilterChange" />
     </Teleport>
 
     <DashboardRealtime />

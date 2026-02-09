@@ -54,6 +54,12 @@ export default eventHandler(async (event) => {
   if (event.path === '/' && homeURL)
     return sendRedirect(event, homeURL)
 
+  const { notFoundRedirect } = useRuntimeConfig(event)
+  // Bypass redirect check for notFoundRedirect path to prevent infinite loop
+  if (notFoundRedirect && event.path === notFoundRedirect) {
+    return
+  }
+
   if (slug && !reserveSlug.includes(slug) && slugRegex.test(slug) && cloudflare) {
     let link: Link | null = null
 
@@ -121,15 +127,13 @@ export default eventHandler(async (event) => {
         const baseUrl = `${getRequestProtocol(event)}://${getRequestHost(event)}`
         const html = generateCloakingHtml(link, buildTarget(link.url), baseUrl)
         setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
-        setHeader(event, 'Cache-Control', 'no-cache')
+        setHeader(event, 'Cache-Control', 'no-store, private')
         return html
       }
 
       return sendRedirect(event, buildTarget(link.url), +redirectStatusCode)
     }
     else {
-      const { notFoundRedirect } = useRuntimeConfig(event)
-
       if (notFoundRedirect) {
         return sendRedirect(event, notFoundRedirect, 302)
       }

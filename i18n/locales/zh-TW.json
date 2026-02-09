@@ -64,7 +64,8 @@
     "export": "匯出",
     "coffee": "請我喝杯咖啡",
     "github": "GitHub",
-    "stars": "Stars"
+    "stars": "Stars",
+    "update": "新版本 {version} 可用（當前: {current}）"
   },
   "home": {
     "hero": {
