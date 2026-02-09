@@ -128,6 +128,12 @@ export default eventHandler(async (event) => {
       return sendRedirect(event, buildTarget(link.url), +redirectStatusCode)
     }
     else {
+      const { notFoundRedirect } = useRuntimeConfig(event)
+
+      if (notFoundRedirect) {
+        return sendRedirect(event, notFoundRedirect, 302)
+      }
+
       throw createError({ status: 404, statusText: 'Link not found' })
     }
   }
