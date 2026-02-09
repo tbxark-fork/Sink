@@ -6,9 +6,17 @@ const { select } = SqlBricks
 function query2sql(query: Query, event: H3Event): string {
   const filter = query2filter(query)
   const { dataset } = useRuntimeConfig(event)
-  // Use weighted distinct count to account for sampling
-  // Formula: COUNT(DISTINCT col) * SUM(_sample_interval) / COUNT() ≈ actual distinct count
-  const sql = select(`index1 as id, SUM(_sample_interval) as visits, ROUND(COUNT(DISTINCT ${logsMap.ip}) * SUM(_sample_interval) / COUNT()) as visitors, ROUND(COUNT(DISTINCT ${logsMap.referer}) * SUM(_sample_interval) / COUNT()) as referers`).from(dataset).where(filter).groupBy('index1')
+  // Weighted distinct count: COUNT(DISTINCT col) * SUM(_sample_interval) / COUNT() ≈ actual distinct count
+  const weightedDistinct = (col: string) => `ROUND(COUNT(DISTINCT ${col}) * SUM(_sample_interval) / COUNT())`
+  const columns = [
+    query.id && 'index1 as id',
+    'SUM(_sample_interval) as visits',
+    `${weightedDistinct(logsMap.ip!)} as visitors`,
+    `${weightedDistinct(logsMap.referer!)} as referers`,
+  ].filter(Boolean).join(', ')
+  const sql = select(columns).from(dataset).where(filter)
+  if (query.id)
+    sql.groupBy('index1')
   appendTimeFilter(sql, query)
   return sql.toString()
 }

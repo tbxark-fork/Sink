@@ -136,7 +136,7 @@ function copyLink() {
               class="w-auto p-0"
               :hide-when-detached="false"
             >
-              <LazyDashboardLinksEditor
+              <DashboardLinksEditor
                 :link="link"
               >
                 <div
@@ -152,11 +152,11 @@ function copyLink() {
                   />
                   {{ $t('common.edit') }}
                 </div>
-              </LazyDashboardLinksEditor>
+              </DashboardLinksEditor>
 
               <Separator />
 
-              <LazyDashboardLinksDelete
+              <DashboardLinksDelete
                 :link="link"
               >
                 <div
@@ -171,7 +171,7 @@ function copyLink() {
                     class="mr-2 h-5 w-5"
                   /> {{ $t('common.delete') }}
                 </div>
-              </LazyDashboardLinksDelete>
+              </DashboardLinksDelete>
             </PopoverContent>
           </Popover>
         </div>
@@ -216,19 +216,19 @@ function copyLink() {
             <template v-if="counters">
               <Badge variant="secondary">
                 <MousePointerClick aria-hidden="true" class="h-3.5 w-3.5" />
-                {{ counters.visits }} {{ $t('dashboard.visits') }}
+                {{ counters.visits }}
               </Badge>
               <Badge variant="secondary">
                 <Users aria-hidden="true" class="h-3.5 w-3.5" />
-                {{ counters.visitors }} {{ $t('dashboard.visitors') }}
+                {{ counters.visitors }}
               </Badge>
               <Badge variant="secondary">
                 <Flame aria-hidden="true" class="h-3.5 w-3.5" />
-                {{ counters.referers }} {{ $t('dashboard.referers') }}
+                {{ counters.referers }}
               </Badge>
             </template>
             <template v-else>
-              <Skeleton class="h-5 w-full rounded-full" />
+              <Skeleton class="h-5 w-full rounded-full bg-secondary" />
             </template>
           </div>
         </div>

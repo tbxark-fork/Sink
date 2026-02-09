@@ -19,8 +19,7 @@ const { stop } = useIntersectionObserver(
 )
 
 onBeforeMount(() => {
-  realtimeStore.restoreFromUrl()
-  realtimeStore.initDefaultTimeRange()
+  realtimeStore.init()
 })
 </script>
 
