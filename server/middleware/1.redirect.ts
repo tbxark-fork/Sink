@@ -72,6 +72,17 @@ export default eventHandler(async (event) => {
     }
 
     if (link) {
+      let locale: RedirectLocale | undefined
+      const getLocale = () => {
+        locale ??= resolveRedirectLocale(getHeader(event, 'accept-language'))
+        return locale
+      }
+      const sendNoStoreHtml = (html: string) => {
+        setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
+        setHeader(event, 'Cache-Control', 'no-store')
+        return html
+      }
+
       // Password protection check
       if (link.password) {
         const headerPassword = getHeader(event, 'x-link-password')
@@ -81,16 +92,12 @@ export default eventHandler(async (event) => {
           const submittedPassword = body?.password
 
           if (submittedPassword !== link.password) {
-            setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
-            setHeader(event, 'Cache-Control', 'no-store')
-            return generatePasswordHtml(slug, true)
+            return sendNoStoreHtml(generatePasswordHtml(slug, { hasError: true, locale: getLocale() }))
           }
 
           // Password correct - show unsafe warning if needed
           if (link.unsafe && body?.confirm !== 'true') {
-            setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
-            setHeader(event, 'Cache-Control', 'no-store')
-            return generateUnsafeWarningHtml(slug, link.url, link.password)
+            return sendNoStoreHtml(generateUnsafeWarningHtml(slug, link.url, { password: link.password, locale: getLocale() }))
           }
         }
         else if (headerPassword) {
@@ -103,9 +110,7 @@ export default eventHandler(async (event) => {
           }
         }
         else {
-          setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
-          setHeader(event, 'Cache-Control', 'no-store')
-          return generatePasswordHtml(slug)
+          return sendNoStoreHtml(generatePasswordHtml(slug, { locale: getLocale() }))
         }
       }
 
@@ -114,15 +119,11 @@ export default eventHandler(async (event) => {
         if (event.method === 'POST') {
           const body = await readBody(event)
           if (body?.confirm !== 'true') {
-            setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
-            setHeader(event, 'Cache-Control', 'no-store')
-            return generateUnsafeWarningHtml(slug, link.url)
+            return sendNoStoreHtml(generateUnsafeWarningHtml(slug, link.url, { locale: getLocale() }))
           }
         }
         else {
-          setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
-          setHeader(event, 'Cache-Control', 'no-store')
-          return generateUnsafeWarningHtml(slug, link.url)
+          return sendNoStoreHtml(generateUnsafeWarningHtml(slug, link.url, { locale: getLocale() }))
         }
       }
 
