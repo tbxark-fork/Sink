@@ -85,16 +85,44 @@ export default eventHandler(async (event) => {
             setHeader(event, 'Cache-Control', 'no-store')
             return generatePasswordHtml(slug, true)
           }
+
+          // Password correct - show unsafe warning if needed
+          if (link.unsafe && body?.confirm !== 'true') {
+            setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
+            setHeader(event, 'Cache-Control', 'no-store')
+            return generateUnsafeWarningHtml(slug, link.url, link.password)
+          }
         }
         else if (headerPassword) {
           if (headerPassword !== link.password) {
             throw createError({ status: 403, statusText: 'Incorrect password' })
+          }
+          // Header-password path: check unsafe warning via x-link-confirm header
+          if (link.unsafe && getHeader(event, 'x-link-confirm') !== 'true') {
+            throw createError({ status: 403, statusText: 'Unsafe link: confirmation required (set x-link-confirm: true header)' })
           }
         }
         else {
           setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
           setHeader(event, 'Cache-Control', 'no-store')
           return generatePasswordHtml(slug)
+        }
+      }
+
+      // Unsafe link warning (for links without password)
+      if (!link.password && link.unsafe) {
+        if (event.method === 'POST') {
+          const body = await readBody(event)
+          if (body?.confirm !== 'true') {
+            setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
+            setHeader(event, 'Cache-Control', 'no-store')
+            return generateUnsafeWarningHtml(slug, link.url)
+          }
+        }
+        else {
+          setHeader(event, 'Content-Type', 'text/html; charset=utf-8')
+          setHeader(event, 'Cache-Control', 'no-store')
+          return generateUnsafeWarningHtml(slug, link.url)
         }
       }
 
