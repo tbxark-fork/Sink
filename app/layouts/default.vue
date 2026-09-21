@@ -96,7 +96,11 @@ function closeMobileMenu() {
                   </NavigationMenuItem>
                   <NavigationMenuItem>
                     <NavigationMenuLink as-child>
-                      <a href="/_docs/scalar">
+                      <a
+                        href="/_docs/scalar"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         {{ $t('layouts.links.api_reference') }}
                       </a>
                     </NavigationMenuLink>
@@ -184,6 +188,8 @@ function closeMobileMenu() {
                     </a>
                     <a
                       href="/_docs/scalar"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       class="
                         flex min-h-11 items-center rounded-xl px-3 text-sm
                         font-medium text-muted-foreground transition-colors
