@@ -76,6 +76,7 @@ On Workers, set the same value in Builds and runtime. On Pages, set once, then r
 | `NUXT_PUBLIC_PREVIEW_MODE`        | empty   | `true` = demo mode (links last 5 minutes)                 |
 | `NUXT_PUBLIC_SLUG_DEFAULT_LENGTH` | `6`     | Length of auto-generated short codes                      |
 | `NUXT_PUBLIC_KV_BATCH_LIMIT`      | `50`    | Export page size; import accepts at most half per request |
+| `NUXT_PUBLIC_MAX_URL_LENGTH`      | `16384` | Maximum target URL length in characters (256-24000)       |
 
 ## Optional
 
@@ -109,6 +110,7 @@ Safe browsing example: Cloudflare Family DNS `https://family.cloudflare-dns.com/
 | `NUXT_LINK_CACHE_TTL`         | `60`                         | How long KV caches a link (seconds)                                                                          |
 | `NUXT_REDIRECT_WITH_QUERY`    | `false`                      | `true` appends visitor query params to the target URL                                                        |
 | `NUXT_REDIRECT_NO_STORE`      | `false`                      | `true` asks browsers not to cache the redirect                                                               |
+| `NUXT_LINK_PROXY_ENABLED`     | `false`                      | `true` allows links to opt into reverse proxy mode; off, stored proxy links fall back to redirects           |
 | `NUXT_CASE_SENSITIVE`         | `false`                      | `true` keeps custom short-code case (`Docs` ≠ `docs`)                                                        |
 | `NUXT_DATASET`                | `sink`                       | Analytics dataset name; must match the `ANALYTICS` binding                                                   |
 | `NUXT_LIST_QUERY_LIMIT`       | `500`                        | Max rows in analytics lists                                                                                  |
