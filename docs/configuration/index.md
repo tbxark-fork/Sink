@@ -71,12 +71,20 @@ Also bind `ANALYTICS`. Add `R2` for [backups](/features/backups), `AI` for [Work
 
 On Workers, set the same value in Builds and runtime. On Pages, set once, then redeploy.
 
-| Variable                          | Default | Purpose                                                   |
-| --------------------------------- | ------- | --------------------------------------------------------- |
-| `NUXT_PUBLIC_PREVIEW_MODE`        | empty   | `true` = demo mode (links last 5 minutes)                 |
-| `NUXT_PUBLIC_SLUG_DEFAULT_LENGTH` | `6`     | Length of auto-generated short codes                      |
-| `NUXT_PUBLIC_KV_BATCH_LIMIT`      | `50`    | Export page size; import accepts at most half per request |
-| `NUXT_PUBLIC_MAX_URL_LENGTH`      | `16384` | Maximum target URL length in characters (256-24000)       |
+| Variable                          | Default | Purpose                                                                                            |
+| --------------------------------- | ------- | -------------------------------------------------------------------------------------------------- |
+| `NUXT_PUBLIC_PREVIEW_MODE`        | empty   | `true` = demo mode (links last 5 minutes)                                                          |
+| `NUXT_PUBLIC_SLUG_DEFAULT_LENGTH` | `6`     | Length of auto-generated short codes                                                               |
+| `NUXT_PUBLIC_KV_BATCH_LIMIT`      | `50`    | Export page size; import accepts at most half per request                                          |
+| `NUXT_PUBLIC_MAX_URL_LENGTH`      | `16384` | Maximum target URL length in characters (256-24000)                                                |
+| `NUXT_PUBLIC_HOME_URL`            | empty   | Non-empty URL redirects `/`; empty shows the Sink homepage                                         |
+| `NUXT_PUBLIC_LINK_PROXY_ENABLED`  | `false` | `true` allows links to opt into reverse proxy mode; off, stored proxy links fall back to redirects |
+
+`NUXT_PUBLIC_*` values are baked into the built UI and read at runtime, so changes need a rebuild before the client picks them up.
+
+`NUXT_HOME_URL` is the deprecated name of `NUXT_PUBLIC_HOME_URL`. It still works, but rename it when you next change your settings.
+
+Click analytics store the target URL in Workers Analytics Engine, which limits all blobs in a data point to 16 KB in total. When the URL plus the other click fields (user agent, referer, and so on) exceeds that size, which is possible near the default 16384-character limit, the click still redirects but is missing from analytics. Lower `NUXT_PUBLIC_MAX_URL_LENGTH` if complete analytics matter more than long URLs.
 
 ## Optional
 
@@ -93,7 +101,6 @@ On Workers, set the same value in Builds and runtime. On Pages, set once, then r
 
 | Variable                                            | Purpose                                                                  |
 | --------------------------------------------------- | ------------------------------------------------------------------------ |
-| `NUXT_HOME_URL`                                     | Non-empty URL redirects `/`; empty shows the Sink homepage               |
 | `NUXT_NOT_FOUND_REDIRECT`                           | Where to send unknown short codes (**always HTTP 302**)                  |
 | `NUXT_CF_ACCESS_TEAM_DOMAIN` + `NUXT_CF_ACCESS_AUD` | Both set → enable [Cloudflare Access](./cloudflare-access)               |
 | `NUXT_SAFE_BROWSING_DOH`                            | DNS-over-HTTPS URL used to check unsafe domains when `unsafe` is not set |
@@ -110,7 +117,6 @@ Safe browsing example: Cloudflare Family DNS `https://family.cloudflare-dns.com/
 | `NUXT_LINK_CACHE_TTL`         | `60`                         | How long KV caches a link (seconds)                                                                          |
 | `NUXT_REDIRECT_WITH_QUERY`    | `false`                      | `true` appends visitor query params to the target URL                                                        |
 | `NUXT_REDIRECT_NO_STORE`      | `false`                      | `true` asks browsers not to cache the redirect                                                               |
-| `NUXT_LINK_PROXY_ENABLED`     | `false`                      | `true` allows links to opt into reverse proxy mode; off, stored proxy links fall back to redirects           |
 | `NUXT_CASE_SENSITIVE`         | `false`                      | `true` keeps custom short-code case (`Docs` ≠ `docs`)                                                        |
 | `NUXT_DATASET`                | `sink`                       | Analytics dataset name; must match the `ANALYTICS` binding                                                   |
 | `NUXT_LIST_QUERY_LIMIT`       | `500`                        | Max rows in analytics lists                                                                                  |

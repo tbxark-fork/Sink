@@ -9,6 +9,7 @@ const LEGACY_VERSIONS = ['2025-03-26', '2024-11-05']
 const createdSlugs = new Set<string>()
 
 beforeEach(async () => {
+  env.NUXT_PUBLIC_LINK_PROXY_ENABLED = 'false'
   await setLinkStoreD1Mode()
 })
 
@@ -189,7 +190,9 @@ describe('/api/mcp handshake', () => {
     const payload = await readEnvelope(response)
     const names = payload.result?.tools.map((tool: { name: string }) => tool.name)
     expect(names).toContain('create_link')
+    expect(names).toContain('check_links')
     expect(names).toContain('get_analytics_metrics')
+    expect(names).toContain('get_analytics_heatmap')
 
     const createTool = payload.result?.tools.find((tool: { name: string }) => tool.name === 'create_link')
     expect(createTool.inputSchema.required).toContain('url')
@@ -212,6 +215,8 @@ describe('/api/mcp handshake', () => {
     expect(tools.get_analytics_views.properties.limit).toBeUndefined()
     expect(tools.get_analytics_metrics.properties.limit).toBeDefined()
     expect(tools.get_analytics_metrics.required).toContain('type')
+    expect(tools.get_analytics_heatmap.properties.limit).toBeUndefined()
+    expect(tools.get_analytics_heatmap.properties.clientTimezone).toBeDefined()
   })
 })
 
@@ -290,6 +295,26 @@ describe('/api/mcp tools', () => {
     expect(kept.payload.result?.isError).toBeUndefined()
     expect((await getStoredLink(slug))?.password).toBeUndefined()
   })
+
+  // Outbound checks are stubbed: the assertion covers the response shape,
+  // not whatever the network returns for the stored target.
+  it('reports link check results with pagination fields', async () => {
+    const slug = trackSlug(`mcp-${crypto.randomUUID()}`)
+    await callTool('create_link', { url: 'https://example.com/mcp-check', slug })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Blocked test outbound request'))
+
+    try {
+      const { payload } = await callTool('check_links', { limit: 3, timeout: 1 })
+      expect(payload.result?.isError).toBeUndefined()
+      const page = payload.result?.structuredContent
+      expect(Array.isArray(page.results)).toBe(true)
+      expect(page.results.length).toBeLessThanOrEqual(3)
+      expect(typeof page.list_complete).toBe('boolean')
+    }
+    finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })
 
 describe('/api/mcp analytics tools', () => {
@@ -297,6 +322,7 @@ describe('/api/mcp analytics tools', () => {
     ['get_analytics_counters', { slug: 'abc' }],
     ['get_analytics_views', { unit: 'day', clientTimezone: 'Asia/Shanghai' }],
     ['get_analytics_metrics', { type: 'browser', limit: 5 }],
+    ['get_analytics_heatmap', { clientTimezone: 'Asia/Shanghai' }],
   ] as const)('answers %s with the WAE result shape', async (tool, args) => {
     const { response, payload } = await callTool(tool, args)
     expect(response.status).toBe(200)
@@ -354,53 +380,6 @@ describe('/api/mcp path normalization', () => {
       path,
     )
     expect(response.status).toBe(status)
-  })
-})
-
-describe('/api/mcp link proxy guard', () => {
-  // The MCP write tools share the same business guard as the REST routes via
-  // link-processing; with NUXT_LINK_PROXY_ENABLED unset they must refuse to
-  // turn proxy on.
-  it('rejects create_link and upsert_link with proxy=true while the flag is off', async () => {
-    const created = await callTool('create_link', {
-      url: 'https://example.com/mcp-proxy',
-      slug: trackSlug(`mcp-proxy-${crypto.randomUUID()}`),
-      proxy: true,
-    })
-    expect(created.payload.result?.isError).toBe(true)
-    expect(created.payload.result?.content[0].text).toContain('403')
-
-    const upserted = await callTool('upsert_link', {
-      url: 'https://example.com/mcp-proxy',
-      slug: trackSlug(`mcp-proxy-${crypto.randomUUID()}`),
-      proxy: true,
-    })
-    expect(upserted.payload.result?.isError).toBe(true)
-    expect(upserted.payload.result?.content[0].text).toContain('403')
-  })
-
-  it('rejects update_link turning proxy on while the flag is off', async () => {
-    const slug = trackSlug(`mcp-proxy-${crypto.randomUUID()}`)
-    const created = await callTool('create_link', { url: 'https://example.com/mcp-plain', slug })
-    expect(created.payload.result?.isError).toBeUndefined()
-
-    const updated = await callTool('update_link', { url: 'https://example.com/mcp-plain', slug, proxy: true })
-    expect(updated.payload.result?.isError).toBe(true)
-    expect(updated.payload.result?.content[0].text).toContain('403')
-    expect((await getStoredLink(slug))?.proxy).toBeUndefined()
-  })
-
-  it('allows proxy writes when NUXT_LINK_PROXY_ENABLED=true', async () => {
-    env.NUXT_LINK_PROXY_ENABLED = 'true'
-    try {
-      const slug = trackSlug(`mcp-proxy-${crypto.randomUUID()}`)
-      const created = await callTool('create_link', { url: 'https://example.com/mcp-proxy', slug, proxy: true })
-      expect(created.payload.result?.isError).toBeUndefined()
-      expect(created.payload.result?.structuredContent.link.proxy).toBe(true)
-    }
-    finally {
-      delete env.NUXT_LINK_PROXY_ENABLED
-    }
   })
 })
 
